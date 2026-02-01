@@ -1,0 +1,33 @@
+{
+    "extron": {
+        "txPin": 17,
+        "rxPin": 18
+    },
+    "hostname": "tinklink",
+    "triggers": [
+        {
+            "input": 1,
+            "mode": "SVS",
+            "profile": 1,
+            "name": "NES"
+        },
+        {
+            "input": 2,
+            "mode": "SVS",
+            "profile": 2,
+            "name": "SNES"
+        },
+        {
+            "input": 3,
+            "mode": "SVS",
+            "profile": 3,
+            "name": "Genesis"
+        },
+        {
+            "input": 4,
+            "mode": "SVS",
+            "profile": 4,
+            "name": "PlayStation"
+        }
+    ]
+}
