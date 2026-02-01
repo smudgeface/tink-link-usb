@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TinkLink-Lite</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>TinkLink-Lite</h1>
+
+        <nav>
+            <a href="/">Status</a>
+            <a href="/config.html">WiFi Config</a>
+            <a href="/debug.html">Debug</a>
+        </nav>
+
+        <div class="card">
+            <h2>WiFi Status</h2>
+            <div class="status-item">
+                <span class="status-label">Status</span>
+                <span class="status-value" id="wifi-status">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Network</span>
+                <span class="status-value" id="wifi-ssid">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">IP Address</span>
+                <span class="status-value" id="wifi-ip">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Signal</span>
+                <span class="status-value" id="wifi-rssi">--</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Extron Switcher</h2>
+            <div class="status-item">
+                <span class="status-label">Current Input</span>
+                <span class="status-value" id="extron-input">--</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>RetroTINK 4K</h2>
+            <div class="status-item">
+                <span class="status-label">Last Command</span>
+                <span class="status-value" id="tink-command">--</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Triggers</h2>
+            <div class="trigger-list" id="trigger-list">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    // WiFi status
+                    const wifiStatus = document.getElementById('wifi-status');
+                    wifiStatus.textContent = data.wifi.state;
+                    wifiStatus.className = 'status-value ' + data.wifi.state;
+
+                    document.getElementById('wifi-ssid').textContent = data.wifi.ssid || '--';
+                    document.getElementById('wifi-ip').textContent = data.wifi.ip || '--';
+                    document.getElementById('wifi-rssi').textContent = data.wifi.rssi ? data.wifi.rssi + ' dBm' : '--';
+
+                    // Extron status
+                    document.getElementById('extron-input').textContent = data.extron.currentInput || '--';
+
+                    // RetroTINK status
+                    document.getElementById('tink-command').textContent = data.tink.lastCommand || '--';
+
+                    // Triggers
+                    const triggerList = document.getElementById('trigger-list');
+                    if (data.triggers && data.triggers.length > 0) {
+                        triggerList.innerHTML = data.triggers.map(t => `
+                            <div class="trigger-item">
+                                <span class="trigger-name">${t.name || 'Input ' + t.input}</span>
+                                <span>Input ${t.input} → Profile ${t.profile} (${t.mode})</span>
+                            </div>
+                        `).join('');
+                    } else {
+                        triggerList.innerHTML = '<div class="loading">No triggers configured</div>';
+                    }
+                })
+                .catch(err => {
+                    console.error('Failed to fetch status:', err);
+                });
+        }
+
+        // Update immediately and then every 2 seconds
+        updateStatus();
+        setInterval(updateStatus, 2000);
+    </script>
+</body>
+</html>

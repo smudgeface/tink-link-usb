@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi Config - TinkLink-Lite</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>TinkLink-Lite</h1>
+
+        <nav>
+            <a href="/">Status</a>
+            <a href="/config.html">WiFi Config</a>
+            <a href="/debug.html">Debug</a>
+        </nav>
+
+        <div id="message"></div>
+
+        <div class="card">
+            <h2>Current Connection</h2>
+            <div class="status-item">
+                <span class="status-label">Mode</span>
+                <span class="status-value" id="wifi-mode">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Status</span>
+                <span class="status-value" id="wifi-status">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Network</span>
+                <span class="status-value" id="wifi-ssid">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">IP Address</span>
+                <span class="status-value" id="wifi-ip">--</span>
+            </div>
+            <div id="ap-info" style="display: none;">
+                <div class="status-item">
+                    <span class="status-label">AP SSID</span>
+                    <span class="status-value" id="ap-ssid">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">AP IP</span>
+                    <span class="status-value" id="ap-ip">--</span>
+                </div>
+            </div>
+            <div class="btn-row" id="disconnect-btn-row" style="display: none;">
+                <button class="secondary" onclick="disconnect()">Disconnect</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Available Networks</h2>
+            <div class="network-list" id="network-list">
+                <div class="loading">Click Scan to find networks</div>
+            </div>
+            <div class="btn-row">
+                <button onclick="scanNetworks()">Scan</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Connect to Network</h2>
+            <form id="connect-form" onsubmit="return connectNetwork(event)">
+                <div class="input-group">
+                    <label for="ssid">Network Name (SSID)</label>
+                    <input type="text" id="ssid" name="ssid" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password">
+                </div>
+                <div class="btn-row">
+                    <button type="submit">Connect</button>
+                    <button type="button" class="secondary" onclick="saveCredentials()">Save & Connect</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.innerHTML = `<div class="message ${type}">${text}</div>`;
+            setTimeout(() => msg.innerHTML = '', 5000);
+        }
+
+        function updateStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    const wifiStatus = document.getElementById('wifi-status');
+                    wifiStatus.textContent = data.wifi.state;
+                    wifiStatus.className = 'status-value ' + data.wifi.state;
+
+                    const wifiMode = document.getElementById('wifi-mode');
+                    wifiMode.textContent = data.wifi.mode ? data.wifi.mode.toUpperCase() : '--';
+
+                    document.getElementById('wifi-ssid').textContent = data.wifi.ssid || '--';
+                    document.getElementById('wifi-ip').textContent = data.wifi.ip || '--';
+
+                    // Show AP info if in AP mode
+                    const apInfo = document.getElementById('ap-info');
+                    if (data.wifi.mode === 'ap' && data.wifi.ap_ssid) {
+                        document.getElementById('ap-ssid').textContent = data.wifi.ap_ssid;
+                        document.getElementById('ap-ip').textContent = data.wifi.ap_ip;
+                        apInfo.style.display = 'block';
+                    } else {
+                        apInfo.style.display = 'none';
+                    }
+
+                    // Show disconnect button only in STA mode when connected or connecting
+                    const disconnectBtn = document.getElementById('disconnect-btn-row');
+                    if (data.wifi.mode === 'sta' && (data.wifi.state === 'connected' || data.wifi.state === 'connecting')) {
+                        disconnectBtn.style.display = 'block';
+                    } else {
+                        disconnectBtn.style.display = 'none';
+                    }
+                })
+                .catch(err => console.error('Failed to fetch status:', err));
+        }
+
+        function scanNetworks() {
+            const list = document.getElementById('network-list');
+            list.innerHTML = '<div class="loading"><span class="spinner"></span>Scanning...</div>';
+
+            function pollScan() {
+                fetch('/api/scan')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'complete') {
+                            if (data.networks && data.networks.length > 0) {
+                                list.innerHTML = data.networks.map(n => `
+                                    <div class="network-item" onclick="selectNetwork('${n.ssid.replace(/'/g, "\\'")}')">
+                                        <span class="network-ssid">${n.ssid}${n.secure ? ' 🔒' : ''}</span>
+                                        <span class="network-signal">${n.rssi} dBm</span>
+                                    </div>
+                                `).join('');
+                            } else {
+                                list.innerHTML = '<div class="loading">No networks found</div>';
+                            }
+                        } else if (data.status === 'scanning') {
+                            // Poll again in 1 second
+                            setTimeout(pollScan, 1000);
+                        }
+                    })
+                    .catch(err => {
+                        list.innerHTML = '<div class="loading">Scan failed</div>';
+                        console.error('Scan failed:', err);
+                    });
+            }
+
+            pollScan();
+        }
+
+        function selectNetwork(ssid) {
+            document.getElementById('ssid').value = ssid;
+            document.getElementById('password').focus();
+        }
+
+        function connectNetwork(event) {
+            event.preventDefault();
+
+            const ssid = document.getElementById('ssid').value;
+            const password = document.getElementById('password').value;
+
+            const formData = new FormData();
+            formData.append('ssid', ssid);
+            formData.append('password', password);
+
+            fetch('/api/connect', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage(data.error, 'error');
+                } else {
+                    showMessage('Connecting to ' + ssid + '...', 'info');
+                }
+            })
+            .catch(err => {
+                showMessage('Connection failed', 'error');
+                console.error('Connect failed:', err);
+            });
+
+            return false;
+        }
+
+        function saveCredentials() {
+            const ssid = document.getElementById('ssid').value;
+            const password = document.getElementById('password').value;
+
+            if (!ssid) {
+                showMessage('Please enter a network name', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('ssid', ssid);
+            formData.append('password', password);
+
+            fetch('/api/save', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage(data.error, 'error');
+                } else {
+                    showMessage('Credentials saved. Connecting...', 'success');
+                    // Also connect
+                    connectNetwork(new Event('submit'));
+                }
+            })
+            .catch(err => {
+                showMessage('Save failed', 'error');
+                console.error('Save failed:', err);
+            });
+        }
+
+        function disconnect() {
+            fetch('/api/disconnect', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    showMessage('Disconnected', 'info');
+                    updateStatus();
+                })
+                .catch(err => console.error('Disconnect failed:', err));
+        }
+
+        // Update status on load and periodically
+        updateStatus();
+        setInterval(updateStatus, 3000);
+    </script>
+</body>
+</html>

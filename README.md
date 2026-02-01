@@ -47,18 +47,68 @@ Supported boards (based on [EspUsbHost](https://github.com/wakwak-koba/EspUsbHos
 
 | Board | Notes |
 |-------|-------|
+| **Waveshare ESP32-S3-Zero** | ✅ **Recommended** - Compact (23.5×18mm), USB-C port, castellated holes. [Board Details](https://www.espboards.dev/esp32/esp32-s3-zero/) |
 | **ESP32-S3-DevKitC-1** | Standard development board, readily available |
 | **M5Stack ATOMS3** | Compact form factor with built-in display |
 | **M5Stack StampS3** | Ultra-compact module |
 
+#### Waveshare ESP32-S3-Zero Details
+
+The **Waveshare ESP32-S3-Zero** is highly suitable for this project:
+
+**Specifications:**
+- **Chip**: ESP32-S3FH4R2 dual-core @ 240MHz
+- **Memory**: 4MB Flash, 2MB PSRAM, 512KB SRAM
+- **Size**: 23.5 × 18mm (ultra-compact)
+- **GPIO**: 24 available pins (GPIO33-37 reserved for PSRAM)
+- **USB**: Native USB on GPIO19 (D-) and GPIO20 (D+)
+- **LED**: WS2812B RGB LED on GPIO21
+- **Power**: 3.7V-6V, minimum 500mA @ 5V
+- **WiFi**: 2.4GHz 802.11 b/g/n
+- **Bluetooth**: BLE 5.0
+
+**USB Host Configuration:**
+
+The ESP32-S3 has two USB controllers sharing GPIO19/GPIO20:
+1. **USB Serial/JTAG** - Default mode for programming and debugging
+2. **USB OTG** - For USB Host/Device functionality
+
+To use USB Host mode, the platformio.ini must configure USB OTG mode:
+```ini
+build_flags =
+    -DARDUINO_USB_MODE=0    ; 0 = OTG mode, 1 = CDC mode (default)
+```
+
+**Trade-offs:**
+- ✅ USB OTG mode enables USB Host functionality for RetroTINK communication
+- ⚠️ Disables USB CDC serial debugging (use UART0 on GPIO43/44 instead)
+- ⚠️ Programming may require holding BOOT button during upload
+
+**References:**
+- [Waveshare ESP32-S3-Zero Wiki](https://www.waveshare.com/wiki/ESP32-S3-Zero)
+- [ESPBoards.dev - ESP32-S3-Zero](https://www.espboards.dev/esp32/esp32-s3-zero/)
+- [Schematic PDF](https://files.waveshare.com/wiki/ESP32-S3-Zero/ESP32-S3-Zero-Sch.pdf)
+- [ESP32-S3 USB OTG Documentation](https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/usb-otg-console.html)
+
 ### Pin Assignments
+
+#### Waveshare ESP32-S3-Zero
 
 | Function | GPIO | Notes |
 |----------|------|-------|
-| USB Host D+ | 20 | Built-in USB OTG (ESP32-S3) |
-| USB Host D- | 19 | Built-in USB OTG (ESP32-S3) |
-| Extron TX | TBD | Hardware UART, 9600 baud |
-| Extron RX | TBD | Hardware UART |
+| USB Host D+ | 20 | Connected to Type-C port (USB OTG mode) |
+| USB Host D- | 19 | Connected to Type-C port (USB OTG mode) |
+| Debug UART TX | 43 | Hardware UART0 TX (for serial debugging) |
+| Debug UART RX | 44 | Hardware UART0 RX |
+| Extron TX | 17 | Hardware UART1 TX, 9600 baud |
+| Extron RX | 18 | Hardware UART1 RX |
+| Status LED | 21 | WS2812B RGB LED (onboard) |
+
+**Important Notes:**
+- GPIO19/20 are internally connected to the board's Type-C USB port
+- USB OTG mode disables USB CDC debugging - use UART0 (GPIO43/44) with a USB-to-TTL adapter for debugging
+- GPIO33-37 are reserved for onboard PSRAM and not available
+- The Type-C port serves dual purpose: programming (Serial/JTAG mode) and USB Host (OTG mode)
 
 ### Wiring Connections
 

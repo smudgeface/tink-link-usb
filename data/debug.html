@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - TinkLink-Lite</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>TinkLink-Lite</h1>
+
+        <nav>
+            <a href="/">Status</a>
+            <a href="/config.html">WiFi Config</a>
+            <a href="/debug.html">Debug</a>
+        </nav>
+
+        <div id="message"></div>
+
+        <div class="card">
+            <h2>RetroTINK Command Tester</h2>
+            <p>Send raw commands to RetroTINK via RMT UART (GPIO1)</p>
+            <p><strong>Note:</strong> Commands are automatically terminated with CRLF (\r\n)</p>
+
+            <form id="command-form" onsubmit="return sendCommand(event)">
+                <div class="input-group">
+                    <label for="command">Command</label>
+                    <input type="text" id="command" name="command" placeholder="e.g., SVS NEW INPUT=1" required autofocus>
+                </div>
+
+                <div class="btn-row">
+                    <button type="submit">Send Command</button>
+                </div>
+            </form>
+
+            <div style="margin-top: 20px;">
+                <h3>Quick Test Commands</h3>
+                <div class="btn-row" style="flex-wrap: wrap; gap: 8px;">
+                    <button class="secondary" onclick="quickCommand('SVS NEW INPUT=1')">SVS Profile 1</button>
+                    <button class="secondary" onclick="quickCommand('SVS NEW INPUT=2')">SVS Profile 2</button>
+                    <button class="secondary" onclick="quickCommand('SVS NEW INPUT=3')">SVS Profile 3</button>
+                    <button class="secondary" onclick="quickCommand('remote prof1')">Remote Prof 1</button>
+                    <button class="secondary" onclick="quickCommand('remote prof2')">Remote Prof 2</button>
+                    <button class="secondary" onclick="quickCommand('TEST')">Test Signal</button>
+                    <button onclick="sendContinuousTest()" style="background: #d4af37; font-weight: bold;">🔁 Continuous Test (10x)</button>
+                </div>
+                <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                    <strong>Tip:</strong> Use "Continuous Test" for oscilloscope triggering - sends 10 signals with 100ms gaps
+                </p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Extron Input Simulator</h2>
+            <p>Simulate Extron input change to test trigger system</p>
+
+            <form id="simulate-form" onsubmit="return simulateInput(event)">
+                <div class="input-group">
+                    <label for="input-number">Input Number (1-16)</label>
+                    <input type="number" id="input-number" name="input" min="1" max="16" value="1" required>
+                </div>
+
+                <div class="btn-row">
+                    <button type="submit">Simulate Input Change</button>
+                </div>
+            </form>
+
+            <div style="margin-top: 20px;">
+                <h3>Quick Input Select</h3>
+                <div class="btn-row" style="flex-wrap: wrap; gap: 8px;">
+                    <button class="secondary" onclick="quickInput(1)">Input 1</button>
+                    <button class="secondary" onclick="quickInput(2)">Input 2</button>
+                    <button class="secondary" onclick="quickInput(3)">Input 3</button>
+                    <button class="secondary" onclick="quickInput(4)">Input 4</button>
+                    <button class="secondary" onclick="quickInput(5)">Input 5</button>
+                    <button class="secondary" onclick="quickInput(6)">Input 6</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Test Signal Info</h2>
+            <p><strong>Oscilloscope Setup:</strong></p>
+            <ul>
+                <li>Connect probe to GPIO1</li>
+                <li>Trigger: Falling edge, 3.3V threshold</li>
+                <li>Timebase: 200µs/div (for full frame)</li>
+                <li>Voltage: 1V/div, DC coupled</li>
+            </ul>
+
+            <p><strong>Expected Timing @ 9600 baud:</strong></p>
+            <ul>
+                <li>Bit period: 104.17µs (~104 RMT ticks @ 1MHz)</li>
+                <li>Idle state: HIGH (3.3V)</li>
+                <li>Start bit: LOW (0V) for 104µs</li>
+                <li>Data bits: LSB first, 8 bits</li>
+                <li>Stop bit: HIGH for 104µs</li>
+            </ul>
+
+            <p><strong>"TEST" command breakdown:</strong></p>
+            <ul>
+                <li>T (0x54): 0b01010100</li>
+                <li>E (0x45): 0b01000101</li>
+                <li>S (0x53): 0b01010011</li>
+                <li>T (0x54): 0b01010100</li>
+                <li>\r (0x0D): 0b00001101</li>
+                <li>\n (0x0A): 0b00001010</li>
+                <li>Total frame: ~6.25ms</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.innerHTML = `<div class="message ${type}">${text}</div>`;
+            setTimeout(() => msg.innerHTML = '', 5000);
+        }
+
+        function sendCommand(event) {
+            event.preventDefault();
+
+            const command = document.getElementById('command').value;
+
+            fetch('/api/debug/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'command=' + encodeURIComponent(command)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage('Error: ' + data.error, 'error');
+                } else {
+                    showMessage('Command sent: ' + data.command, 'success');
+                    console.log('Command sent:', data.command);
+                }
+            })
+            .catch(err => {
+                showMessage('Failed to send command', 'error');
+                console.error('Send failed:', err);
+            });
+
+            return false;
+        }
+
+        function quickCommand(cmd) {
+            document.getElementById('command').value = cmd;
+            sendCommand(new Event('submit'));
+        }
+
+        function simulateInput(event) {
+            event.preventDefault();
+
+            const input = document.getElementById('input-number').value;
+
+            fetch('/api/debug/simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'input=' + input
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage('Error: ' + data.error, 'error');
+                } else {
+                    showMessage('Simulated input ' + data.input + ' → ' + data.result, 'success');
+                    console.log('Simulation result:', data);
+                }
+            })
+            .catch(err => {
+                showMessage('Failed to simulate input', 'error');
+                console.error('Simulate failed:', err);
+            });
+
+            return false;
+        }
+
+        function quickInput(num) {
+            document.getElementById('input-number').value = num;
+            simulateInput(new Event('submit'));
+        }
+
+        function sendContinuousTest() {
+            fetch('/api/debug/continuous', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'count=10'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage('Error: ' + data.error, 'error');
+                } else {
+                    showMessage('Sent ' + data.count + ' test signals (check oscilloscope)', 'success');
+                    console.log('Continuous test sent:', data.count, 'signals');
+                }
+            })
+            .catch(err => {
+                showMessage('Failed to send continuous test', 'error');
+                console.error('Continuous test failed:', err);
+            });
+        }
+    </script>
+</body>
+</html>
