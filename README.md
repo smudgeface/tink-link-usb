@@ -1,8 +1,10 @@
 # TinkLink-USB
 
-> 🚧 **Status**: In development
+> 🚧 **Status**: Phase 1 Complete - Base framework ready, USB Host implementation next
 
 A USB-based ESP32-S3 bridge between video switchers and the RetroTINK 4K.
+
+📋 **[Implementation Plan](implementation-plan.md)** - Detailed development roadmap and current status
 
 TinkLink-USB automatically triggers RetroTINK 4K profile changes when your video switcher changes inputs. This version uses **USB Host** to communicate directly with the RetroTINK 4K over its USB serial interface, eliminating the need for VGA cable serial connections and level shifters.
 
@@ -168,7 +170,33 @@ SVS NEW INPUT=2\r\n    # Switch to input 2 and load S2_*.rt4 profile
 
 ### Installation
 
-_Installation instructions coming soon_
+**Current Status - Phase 1 (CDC Mode Testing)**:
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/smudgeface/tink-link-usb.git
+   cd tink-link-usb
+   ```
+
+2. **Connect ESP32-S3-Zero** via USB-C cable
+
+3. **Build and upload** (CDC mode - for initial testing):
+   ```bash
+   pio run -e esp32s3 -t upload
+   pio run -e esp32s3 -t uploadfs
+   pio device monitor
+   ```
+
+4. **Configure WiFi:**
+   - Device will start in AP mode if no credentials saved
+   - Connect to `TinkLink-XXXXXX` network
+   - Browse to `http://192.168.1.1`
+   - Configure your WiFi network
+
+5. **Access web interface:**
+   - After WiFi configured: `http://tinklink.local`
+
+**Note**: USB Host functionality (Phase 2) not yet implemented. See [implementation-plan.md](implementation-plan.md) for roadmap.
 
 ## Project Structure
 
