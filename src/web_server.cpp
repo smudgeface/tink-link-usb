@@ -120,11 +120,11 @@ void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
 
     // Triggers
     JsonArray triggersArray = doc["triggers"].to<JsonArray>();
-    for (const auto& trigger : _tink->getTriggers()) {
+    for (const auto& trigger : _config->getTriggers()) {
         JsonObject triggerObj = triggersArray.add<JsonObject>();
         triggerObj["input"] = trigger.extronInput;
         triggerObj["profile"] = trigger.profile;
-        triggerObj["mode"] = trigger.mode == ProfileMode::SVS ? "SVS" : "Remote";
+        triggerObj["mode"] = trigger.mode == TriggerMapping::SVS ? "SVS" : "Remote";
         triggerObj["name"] = trigger.name;
     }
 
