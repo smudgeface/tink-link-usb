@@ -64,11 +64,292 @@ ARDUINO_USB_CDC_ON_BOOT=1    # Enable USB CDC
 
 ---
 
-## Phase 2: USB Host FTDI Implementation
+## Phase 2: WiFi and LED Functionality Testing
+
+**Goal**: Verify WiFi connectivity, AP fallback, and WS2812 LED status indication on ESP32-S3 hardware
+
+### 2.1: Hardware Setup
+
+**Connect ESP32-S3-Zero**:
+- USB-C cable to computer for programming and serial debugging
+- No other connections needed for WiFi testing
+
+**LED Hardware**:
+- WS2812B RGB LED on GPIO21 (onboard)
+- Reference: [ESP32-S3-Zero Board Details](https://www.espboards.dev/esp32/esp32-s3-zero/)
+
+### 2.2: WS2812 LED Control Implementation
+
+**Objective**: Replace simple digitalWrite() with proper WS2812 RGB LED control
+
+**Library Selection**:
+- Use **FastLED** or **Adafruit_NeoPixel** library
+- FastLED recommended for ESP32 compatibility
+
+**Add to platformio.ini**:
+```ini
+lib_deps =
+    bblanchon/ArduinoJson@^7.0.0
+    me-no-dev/ESPAsyncWebServer@^1.2.3
+    me-no-dev/AsyncTCP@^1.1.1
+    fastled/FastLED@^3.6.0
+```
+
+**Update main.cpp**:
+
+Current (placeholder) code:
+```cpp
+#define RGB_LED_PIN 21
+// Simple digitalWrite() control
+digitalWrite(RGB_LED_PIN, ledOn ? HIGH : LOW);
+```
+
+Replace with WS2812 control:
+```cpp
+#include <FastLED.h>
+
+#define RGB_LED_PIN 21
+#define NUM_LEDS 1
+CRGB leds[NUM_LEDS];
+
+void setup() {
+    // Initialize WS2812 LED
+    FastLED.addLeds<WS2812, RGB_LED_PIN, GRB>(leds, NUM_LEDS);
+    FastLED.setBrightness(50);  // 0-255, adjust as needed
+    leds[0] = CRGB::Black;      // Off initially
+    FastLED.show();
+    // ... rest of setup
+}
+
+void loop() {
+    // ... other code
+
+    // LED status indication
+    if (wifiManager.getState() == WifiManager::State::AP_ACTIVE) {
+        // Blink blue in AP mode (500ms interval)
+        if (now - lastBlink >= 500) {
+            lastBlink = now;
+            ledOn = !ledOn;
+            leds[0] = ledOn ? CRGB::Blue : CRGB::Black;
+            FastLED.show();
+        }
+    } else if (wifiManager.getState() == WifiManager::State::CONNECTED) {
+        // Solid green when connected
+        leds[0] = CRGB::Green;
+        FastLED.show();
+    } else if (wifiManager.getState() == WifiManager::State::CONNECTING) {
+        // Yellow when connecting
+        leds[0] = CRGB::Yellow;
+        FastLED.show();
+    } else {
+        // Off for other states
+        leds[0] = CRGB::Black;
+        FastLED.show();
+    }
+}
+```
+
+**LED Color Scheme**:
+- **Blue blinking** (500ms) = Access Point mode active
+- **Yellow solid** = Connecting to WiFi
+- **Green solid** = Connected to WiFi network
+- **Red** = Connection failed (optional)
+- **Off** = Disconnected or initializing
+
+### 2.3: WiFi Functionality Testing
+
+**Test 1: First Boot (No WiFi Configuration)**
+
+Expected behavior:
+1. Device boots with no `wifi.json` file
+2. Automatically starts AP mode
+3. LED blinks blue (500ms interval)
+4. Serial output shows:
+   ```
+   No WiFi credentials saved - starting Access Point mode
+   ========================================
+     Access Point Active
+   ========================================
+     SSID:     TinkLink-XXXXXX
+     IP:       192.168.1.1
+   ```
+
+Steps:
+- Upload firmware to ESP32-S3-Zero
+- Monitor serial output
+- Verify LED blinks blue
+- Scan for WiFi networks on phone/laptop
+- Confirm `TinkLink-XXXXXX` network appears
+
+**Test 2: AP Mode WiFi Configuration**
+
+Expected behavior:
+1. Connect to TinkLink AP
+2. Get automatic IP via DHCP (192.168.1.100-200 range)
+3. Access web interface at http://192.168.1.1
+4. Scan for networks via web UI
+5. Select network, enter password, save
+6. Device disconnects AP, connects to network
+
+Steps:
+- Connect phone/laptop to TinkLink AP
+- Open browser to http://192.168.1.1
+- Verify index.html loads
+- Navigate to config.html
+- Click "Scan" button
+- Verify networks appear
+- Select your 2.4GHz network
+- Enter password
+- Click "Save & Connect"
+- Monitor serial output for connection attempt
+- Verify LED changes from blinking blue to yellow to green
+- Verify web interface accessible at http://tinklink.local
+
+**Test 3: WiFi Credentials Persistence**
+
+Expected behavior:
+1. Credentials saved to `/wifi.json` in LittleFS
+2. Device reboots and auto-connects
+3. No AP mode started
+4. LED goes yellow → green
+
+Steps:
+- With WiFi connected, press reset button on ESP32-S3-Zero
+- Monitor serial output
+- Verify shows "Attempting to connect to saved network: [SSID]"
+- Verify LED shows yellow then green
+- Verify web interface accessible at http://tinklink.local
+- No AP network should be broadcasting
+
+**Test 4: AP Fallback (Wrong Password)**
+
+Expected behavior:
+1. Modify `wifi.json` with incorrect password
+2. Upload filesystem
+3. Device attempts connection
+4. Fails after retries (~60 seconds)
+5. Falls back to AP mode
+6. LED blinks blue again
+
+Steps:
+- Edit `data/wifi.json` with wrong password
+- Upload filesystem: `pio run -t uploadfs`
+- Reset device
+- Monitor serial output
+- Verify connection attempts and failures
+- Verify fallback to AP mode after timeout
+- Verify LED returns to blinking blue
+- Verify TinkLink AP network broadcasting
+
+**Test 5: AP Fallback (Network Unavailable)**
+
+Expected behavior:
+1. Configure valid credentials for network that's powered off
+2. Device attempts connection
+3. Fails after retries
+4. Falls back to AP mode
+
+Steps:
+- Power off your WiFi router temporarily
+- Reset ESP32-S3-Zero
+- Monitor serial output for connection attempts
+- Verify fallback to AP mode
+- Power router back on
+- Manually reconnect via AP mode web interface
+
+**Test 6: mDNS Resolution**
+
+Expected behavior:
+1. Device connected to WiFi
+2. Accessible via http://tinklink.local
+3. No need for IP address
+
+Steps:
+- With device connected to WiFi
+- Open browser to http://tinklink.local
+- Verify web interface loads
+- Test on multiple devices (computer, phone, tablet)
+- Note: Windows may require Bonjour service
+
+**Test 7: Web Interface Pages**
+
+Verify all pages load correctly:
+- `/` - Status page (index.html)
+  - Shows WiFi status
+  - Shows current Extron input (0 if not connected)
+  - Shows last RetroTINK command
+  - Lists configured triggers
+- `/config.html` - WiFi configuration page
+  - Scan button works
+  - Network list populates
+  - Can save credentials
+  - Can disconnect
+- `/debug.html` - Debug page
+  - Can send raw RetroTINK commands (logged only in Phase 1)
+  - Can simulate Extron input changes
+  - Can send continuous test signals
+
+**Test 8: API Endpoints**
+
+Test all API endpoints via curl or browser:
+```bash
+# Status
+curl http://tinklink.local/api/status
+
+# Scan networks
+curl http://tinklink.local/api/scan
+
+# Connect (POST)
+curl -X POST http://tinklink.local/api/connect \
+  -d "ssid=YourNetwork&password=YourPassword"
+
+# Disconnect
+curl -X POST http://tinklink.local/api/disconnect
+
+# Save credentials
+curl -X POST http://tinklink.local/api/save \
+  -d "ssid=YourNetwork&password=YourPassword"
+
+# Debug: Send command
+curl -X POST http://tinklink.local/api/debug/send \
+  -d "command=remote prof1"
+
+# Debug: Simulate input
+curl -X POST http://tinklink.local/api/debug/simulate \
+  -d "input=1"
+
+# Debug: Continuous test
+curl -X POST http://tinklink.local/api/debug/continuous \
+  -d "count=5"
+```
+
+### 2.4: Success Criteria
+
+Phase 2 is complete when:
+- ✅ WS2812 LED displays correct colors for each WiFi state
+- ✅ AP mode starts automatically when no credentials exist
+- ✅ Can configure WiFi via web interface in AP mode
+- ✅ Credentials persist across reboots
+- ✅ Auto-connects to saved network on boot
+- ✅ Falls back to AP mode after connection failures (~60s)
+- ✅ mDNS resolution works (http://tinklink.local)
+- ✅ All web pages load correctly
+- ✅ All API endpoints respond as expected
+- ✅ Serial output provides clear status messages
+- ✅ No crashes or hangs during WiFi state transitions
+
+**Known Issues to Watch For**:
+- WS2812 timing sensitivity (may need to adjust FastLED settings)
+- mDNS may not work on all networks (routers blocking multicast)
+- 2.4GHz WiFi only (5GHz networks will not appear in scan)
+
+---
+
+## Phase 3: USB Host FTDI Implementation
 
 **Goal**: Implement USB Host communication with RetroTINK 4K via FTDI serial
 
-### 2.1: USB Host Test Fixture
+### 3.1: USB Host Test Fixture
 
 **Objective**: Verify USB Host FTDI communication in isolation before integration
 
@@ -103,7 +384,7 @@ ARDUINO_USB_CDC_ON_BOOT=1    # Enable USB CDC
 - Use UART0 (GPIO43/44) with USB-to-TTL adapter for serial debugging
 - Web interface still available for status monitoring (if WiFi connected)
 
-### 2.2: USB Host FTDI Class Implementation
+### 3.2: USB Host FTDI Class Implementation
 
 **Objective**: Create reusable USB Host FTDI serial class
 
@@ -153,7 +434,7 @@ private:
 - Verify command transmission
 - Check for proper initialization and cleanup
 
-### 2.3: RetroTINK Integration
+### 3.3: RetroTINK Integration
 
 **Objective**: Replace stub implementation with USB Host serial
 
@@ -187,9 +468,9 @@ RetroTink::RetroTink(UsbHostFtdi* usbSerial)
 
 ---
 
-## Phase 3: Testing and Validation
+## Phase 4: Testing and Validation
 
-### 3.1: UART Loopback Test (Extron)
+### 4.1: UART Loopback Test (Extron)
 
 **Goal**: Verify Extron UART hardware before RS-232 integration
 
@@ -208,7 +489,7 @@ RetroTink::RetroTink(UsbHostFtdi* usbSerial)
 - Characters sent on TX (GPIO17) received on RX (GPIO18)
 - Clean UART waveform (if oscilloscope available)
 
-### 3.2: USB Host Integration Test
+### 4.2: USB Host Integration Test
 
 **Goal**: Verify complete system with RetroTINK 4K
 
@@ -259,7 +540,7 @@ RetroTink::RetroTink(UsbHostFtdi* usbSerial)
 - ✅ Web interface accurately reflects system state
 - ✅ No crashes or memory leaks during extended operation
 
-### 3.3: Performance and Stability
+### 4.3: Performance and Stability
 
 **Long-term Test**:
 - Run system continuously for 24+ hours
@@ -274,7 +555,7 @@ RetroTink::RetroTink(UsbHostFtdi* usbSerial)
 
 ---
 
-## Phase 4: USB OTG Mode Transition
+## Phase 5: USB OTG Mode Transition
 
 **Goal**: Switch from CDC debugging to USB OTG mode for production
 
@@ -300,9 +581,9 @@ ARDUINO_USB_CDC_ON_BOOT=0    # Disable CDC
 
 ---
 
-## Phase 5: Documentation and Cleanup
+## Phase 6: Documentation and Cleanup
 
-### 5.1: Update README.md
+### 6.1: Update README.md
 
 **Additions**:
 - Installation instructions for ESP32-S3
@@ -310,7 +591,7 @@ ARDUINO_USB_CDC_ON_BOOT=0    # Disable CDC
 - Troubleshooting section for USB Host issues
 - Wiring diagrams for complete setup
 
-### 5.2: Code Comments
+### 6.2: Code Comments
 
 **Review and document**:
 - USB Host initialization sequence
@@ -318,14 +599,14 @@ ARDUINO_USB_CDC_ON_BOOT=0    # Disable CDC
 - Error handling logic
 - Configuration options
 
-### 5.3: Examples
+### 6.3: Examples
 
 **Create**:
 - `examples/usb_host_test/` - Standalone USB Host test
 - `examples/minimal/` - Minimal working configuration
 - `examples/full_setup/` - Complete example with all features
 
-### 5.4: GitHub Repository
+### 6.4: GitHub Repository
 
 **Create and push**:
 - Create GitHub repository: `smudgeface/tink-link-usb`
@@ -473,15 +754,26 @@ void loop() {
 
 ## Next Steps
 
-**Immediate Actions**:
-1. Connect Waveshare ESP32-S3-Zero to computer
-2. Upload Phase 1 firmware (CDC mode)
-3. Verify basic functionality (WiFi, web interface, Extron UART loopback)
-4. Begin Phase 2: USB Host FTDI implementation
+**Immediate Actions** (Phase 2: WiFi Testing):
+1. Connect Waveshare ESP32-S3-Zero to computer via USB-C
+2. Add FastLED library dependency to platformio.ini
+3. Update main.cpp to use WS2812 LED control
+4. Build and upload firmware (CDC mode)
+5. Monitor serial output during boot
+6. Test all WiFi functionality:
+   - AP mode on first boot
+   - WiFi configuration via web interface
+   - Credential persistence
+   - AP fallback scenarios
+   - LED color indications
+7. Verify all web pages and API endpoints
+8. After Phase 2 complete, proceed to Phase 3: USB Host FTDI implementation
 
 **Agent Handoff Notes**:
 - All code compiles successfully
 - Git history is clean with descriptive commits
 - README.md contains all reference links
-- Ready to begin USB Host implementation
+- Phase 1 complete - ready to begin Phase 2 WiFi testing
 - User has Waveshare ESP32-S3-Zero hardware available
+- WS2812 LED on GPIO21 needs FastLED integration
+- After WiFi testing complete, proceed to Phase 3 USB Host implementation
