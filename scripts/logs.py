@@ -100,7 +100,9 @@ def tail_logs(host, interval=1.0):
 
     try:
         while True:
-            data = fetch_logs(host, since=last_total, count=100, timeout=3)
+            # If we were disconnected, fetch from beginning to catch boot logs
+            fetch_since = 0 if not connected else last_total
+            data = fetch_logs(host, since=fetch_since, count=100, timeout=3)
 
             if data is None:
                 if connected:
@@ -118,22 +120,18 @@ def tail_logs(host, interval=1.0):
             total = data.get('total', 0)
             logs = data.get('logs', [])
 
-            # Detect device reboot: total count reset or went backwards
-            if total < last_total:
-                if not connected:
-                    print(f"\033[32m[Device reconnected - reboot detected]\033[0m")
-                else:
-                    print(f"\033[33m[Device rebooted - log count reset]\033[0m")
-                # Fetch recent logs from the beginning
-                last_total = 0
+            # Handle reconnection after disconnect
+            if not connected:
+                print(f"\033[32m[Device reconnected]\033[0m")
+                connected = True
+            # Detect device reboot while connected: total count went backwards
+            elif total < last_total:
+                print(f"\033[33m[Device rebooted - fetching boot logs]\033[0m")
+                # Fetch from beginning to get boot logs
                 data = fetch_logs(host, since=0, count=100, timeout=3)
                 if data:
                     logs = data.get('logs', [])
                     total = data.get('total', 0)
-
-            if not connected:
-                print(f"\033[32m[Device reconnected]\033[0m")
-                connected = True
 
             if logs:
                 print_logs(logs)
