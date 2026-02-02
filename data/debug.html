@@ -261,10 +261,25 @@
         let lastUartCount = 0;
         let lastLogCount = 0;
 
-        function appendToConsole(text, type) {
+        function formatTimestamp(ms) {
+            // Format milliseconds since boot as [HH:MM:SS.mmm]
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            const milliseconds = ms % 1000;
+
+            return `[${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}]`;
+        }
+
+        function appendToConsole(text, type, timestamp) {
             const consoleOutput = document.getElementById('console-output');
             const line = document.createElement('span');
             line.style.display = 'block';
+
+            // Add timestamp prefix for backend messages (if provided)
+            const tsPrefix = timestamp !== undefined ?
+                '<span style="color: #666;">' + formatTimestamp(timestamp) + '</span> ' : '';
 
             if (type === 'tx-extron') {
                 line.innerHTML = '<span style="color: #569cd6;">[extron] &gt; ' + escapeHtml(text) + '</span>';
@@ -273,19 +288,19 @@
             } else if (type === 'tx') {
                 line.innerHTML = '<span style="color: #569cd6;">&gt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'rx-extron') {
-                line.innerHTML = '<span style="color: #4ec9b0;">[extron] &lt; ' + escapeHtml(text) + '</span>';
+                line.innerHTML = tsPrefix + '<span style="color: #4ec9b0;">[extron] &lt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'rx-tink') {
-                line.innerHTML = '<span style="color: #ce9178;">[tink] &lt; ' + escapeHtml(text) + '</span>';
+                line.innerHTML = tsPrefix + '<span style="color: #ce9178;">[tink] &lt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'rx') {
-                line.innerHTML = '<span style="color: #4ec9b0;">&lt; ' + escapeHtml(text) + '</span>';
+                line.innerHTML = tsPrefix + '<span style="color: #4ec9b0;">&lt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'log-debug') {
-                line.innerHTML = '<span style="color: #808080;">[D] ' + escapeHtml(text) + '</span>';
+                line.innerHTML = tsPrefix + '<span style="color: #808080;">[D] ' + escapeHtml(text) + '</span>';
             } else if (type === 'log-info') {
-                line.innerHTML = '<span style="color: #9cdcfe;">[I] ' + escapeHtml(text) + '</span>';
+                line.innerHTML = tsPrefix + '<span style="color: #9cdcfe;">[I] ' + escapeHtml(text) + '</span>';
             } else if (type === 'log-warn') {
-                line.innerHTML = '<span style="color: #dcdcaa;">[W] ' + escapeHtml(text) + '</span>';
+                line.innerHTML = tsPrefix + '<span style="color: #dcdcaa;">[W] ' + escapeHtml(text) + '</span>';
             } else if (type === 'log-error') {
-                line.innerHTML = '<span style="color: #f14c4c;">[E] ' + escapeHtml(text) + '</span>';
+                line.innerHTML = tsPrefix + '<span style="color: #f14c4c;">[E] ' + escapeHtml(text) + '</span>';
             } else if (type === 'system') {
                 line.innerHTML = '<span style="color: #6a9955;">' + escapeHtml(text) + '</span>';
             } else {
@@ -384,7 +399,7 @@
                 // Append new system logs
                 if (logData.logs && logData.logs.length > 0) {
                     logData.logs.forEach(log => {
-                        appendToConsole(log.msg, getLogType(log.lvl));
+                        appendToConsole(log.msg, getLogType(log.lvl), log.ts);
                     });
                     lastLogCount = logData.total;
                 }
@@ -543,7 +558,7 @@
             .then(data => {
                 if (data.logs && data.logs.length > 0) {
                     data.logs.forEach(log => {
-                        appendToConsole(log.msg, getLogType(log.lvl));
+                        appendToConsole(log.msg, getLogType(log.lvl), log.ts);
                     });
                     lastLogCount = data.total;
                 }
