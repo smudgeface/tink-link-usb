@@ -213,6 +213,8 @@ pio run -e esp32s3 -t upload
 
 The device will automatically reset after upload.
 
+**Note**: In Phase 3 (USB Host mode), CDC will be disabled and USB uploads will require holding the **BOOT button** during upload, or using OTA updates instead.
+
 #### Step 5: Upload Filesystem
 
 Upload the web interface files (HTML, CSS, config files) to the device's LittleFS filesystem:
@@ -299,8 +301,8 @@ python scripts/ota_upload.py fs .pio/build/esp32s3/littlefs.bin
 python scripts/ota_upload.py firmware firmware.bin --host 192.168.1.100
 ```
 
-**Environment Variables:**
-- `TINKLINK_HOST` - Device hostname/IP (default: `tinklink.local`)
+**Environment Variable (optional):**
+- `TINKLINK_HOST` - Override device hostname/IP (default: `tinklink.local`). Useful if mDNS isn't working on your network or you prefer using a static IP. PlatformIO custom targets don't accept command-line arguments, so this env variable is the only way to specify a different host.
 
 ## Troubleshooting
 
