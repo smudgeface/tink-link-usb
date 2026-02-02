@@ -1,9 +1,9 @@
-#include "web_server.h"
-#include "wifi_manager.h"
-#include "config_manager.h"
-#include "extron_sw_vga.h"
-#include "retrotink.h"
-#include "logger.h"
+#include "WebServer.h"
+#include "WifiManager.h"
+#include "ConfigManager.h"
+#include "ExtronSwVga.h"
+#include "RetroTink.h"
+#include "Logger.h"
 #include "version.h"
 #include <ArduinoJson.h>
 #include <LittleFS.h>
@@ -65,19 +65,20 @@ void WebServer::setupRoutes() {
     _server->on("/api/wifi/save", HTTP_POST,
         [this](AsyncWebServerRequest* request) { handleApiSave(request); });
 
-    // Debug endpoints
-    _server->on("/api/debug/send", HTTP_POST,
-        [this](AsyncWebServerRequest* request) { handleApiDebugSend(request); });
+    // RetroTINK endpoints
+    _server->on("/api/tink/send", HTTP_POST,
+        [this](AsyncWebServerRequest* request) { handleApiTinkSend(request); });
 
+    // Debug endpoints
     _server->on("/api/debug/led", HTTP_POST,
         [this](AsyncWebServerRequest* request) { handleApiDebugLED(request); });
 
-    // UART loopback testing endpoints
-    _server->on("/api/uart/send", HTTP_POST,
-        [this](AsyncWebServerRequest* request) { handleApiUartSend(request); });
+    // Switcher endpoints
+    _server->on("/api/switcher/send", HTTP_POST,
+        [this](AsyncWebServerRequest* request) { handleApiSwitcherSend(request); });
 
-    _server->on("/api/uart/receive", HTTP_GET,
-        [this](AsyncWebServerRequest* request) { handleApiUartReceive(request); });
+    _server->on("/api/switcher/receive", HTTP_GET,
+        [this](AsyncWebServerRequest* request) { handleApiSwitcherReceive(request); });
 
     // System logs endpoint
     _server->on("/api/logs", HTTP_GET,
@@ -149,8 +150,9 @@ void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
         doc["wifi"]["ap_ip"] = apConfig.ip.toString();
     }
 
-    // Extron status
-    doc["extron"]["currentInput"] = _extron->getCurrentInput();
+    // Switcher status
+    doc["switcher"]["type"] = _extron->getTypeName();
+    doc["switcher"]["currentInput"] = _extron->getCurrentInput();
 
     // RetroTINK status
     doc["tink"]["lastCommand"] = _tink->getLastCommand();
@@ -259,7 +261,7 @@ void WebServer::handleApiSave(AsyncWebServerRequest* request) {
     }
 }
 
-void WebServer::handleApiDebugSend(AsyncWebServerRequest* request) {
+void WebServer::handleApiTinkSend(AsyncWebServerRequest* request) {
     String command;
 
     if (request->hasParam("command", true)) {
@@ -271,7 +273,7 @@ void WebServer::handleApiDebugSend(AsyncWebServerRequest* request) {
         return;
     }
 
-    LOG_DEBUG("WebServer: Debug command: %s", command.c_str());
+    LOG_DEBUG("WebServer: Tink command: %s", command.c_str());
 
     // Send command to RetroTINK
     _tink->sendRawCommand(command.c_str());
@@ -355,7 +357,7 @@ void WebServer::handleApiDebugLED(AsyncWebServerRequest* request) {
     }
 }
 
-void WebServer::handleApiUartSend(AsyncWebServerRequest* request) {
+void WebServer::handleApiSwitcherSend(AsyncWebServerRequest* request) {
     if (!request->hasParam("message", true)) {
         request->send(400, "application/json", "{\"error\":\"Missing message parameter\"}");
         return;
@@ -363,9 +365,9 @@ void WebServer::handleApiUartSend(AsyncWebServerRequest* request) {
 
     String message = request->getParam("message", true)->value();
 
-    LOG_DEBUG("WebServer: Sending UART test message: [%s]", message.c_str());
+    LOG_DEBUG("WebServer: Sending switcher message: [%s]", message.c_str());
 
-    // Send via Extron UART
+    // Send via switcher UART
     _extron->sendCommand(message.c_str());
 
     // Return success response
@@ -378,7 +380,7 @@ void WebServer::handleApiUartSend(AsyncWebServerRequest* request) {
     request->send(200, "application/json", response);
 }
 
-void WebServer::handleApiUartReceive(AsyncWebServerRequest* request) {
+void WebServer::handleApiSwitcherReceive(AsyncWebServerRequest* request) {
     // Get count parameter (default 10, max 50)
     int count = 10;
     if (request->hasParam("count")) {

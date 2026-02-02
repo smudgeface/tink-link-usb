@@ -38,10 +38,10 @@
         </div>
 
         <div class="card">
-            <h2>Extron Switcher</h2>
+            <h2>Switcher <span id="switcher-type" class="version"></span></h2>
             <div class="status-item">
                 <span class="status-label">Current Input</span>
-                <span class="status-value" id="extron-input">--</span>
+                <span class="status-value" id="switcher-input">--</span>
             </div>
         </div>
 
@@ -78,8 +78,9 @@
                     document.getElementById('wifi-ip').textContent = data.wifi.ip || '--';
                     document.getElementById('wifi-rssi').textContent = data.wifi.rssi ? data.wifi.rssi + ' dBm' : '--';
 
-                    // Extron status
-                    document.getElementById('extron-input').textContent = data.extron.currentInput || '--';
+                    // Switcher status
+                    document.getElementById('switcher-type').textContent = data.switcher.type || '';
+                    document.getElementById('switcher-input').textContent = data.switcher.currentInput || '--';
 
                     // RetroTINK status
                     document.getElementById('tink-command').textContent = data.tink.lastCommand || '--';

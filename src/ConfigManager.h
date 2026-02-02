@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <vector>
-#include "retrotink.h"
+#include "RetroTink.h"
 
 /// Path to main configuration file in LittleFS
 #define CONFIG_PATH "/config.json"
@@ -35,9 +35,10 @@ public:
     };
 
     /**
-     * Extron switcher UART pin configuration.
+     * Video switcher UART pin configuration.
      */
-    struct ExtronConfig {
+    struct SwitcherConfig {
+        String type;    ///< Switcher type (e.g., "Extron SW VGA")
         uint8_t txPin;  ///< UART TX pin (default: GPIO43)
         uint8_t rxPin;  ///< UART RX pin (default: GPIO44)
     };
@@ -78,10 +79,10 @@ public:
     /** @return Current WiFi configuration */
     const WifiConfig& getWifiConfig() const { return _wifiConfig; }
 
-    /** @return Current Extron pin configuration */
-    const ExtronConfig& getExtronConfig() const { return _extronConfig; }
+    /** @return Current switcher pin configuration */
+    const SwitcherConfig& getSwitcherConfig() const { return _switcherConfig; }
 
-    /** @return List of configured Extron input to RetroTINK profile triggers */
+    /** @return List of configured switcher input to RetroTINK profile triggers */
     const std::vector<TriggerMapping>& getTriggers() const { return _triggers; }
 
     /**
@@ -111,7 +112,7 @@ public:
 
 private:
     WifiConfig _wifiConfig;
-    ExtronConfig _extronConfig;
+    SwitcherConfig _switcherConfig;
     std::vector<TriggerMapping> _triggers;
 
     bool loadDefaultConfig();

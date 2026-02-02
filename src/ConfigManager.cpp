@@ -1,12 +1,13 @@
-#include "config_manager.h"
-#include "logger.h"
+#include "ConfigManager.h"
+#include "Logger.h"
 #include <LittleFS.h>
 
 ConfigManager::ConfigManager() {
     // Default pin assignments for ESP32-S3-Zero
-    // Extron uses UART0 on GPIO43 (TX) / GPIO44 (RX)
-    _extronConfig.txPin = 43;
-    _extronConfig.rxPin = 44;
+    // Switcher uses UART0 on GPIO43 (TX) / GPIO44 (RX)
+    _switcherConfig.type = "Extron SW VGA";
+    _switcherConfig.txPin = 43;
+    _switcherConfig.rxPin = 44;
     _wifiConfig.hostname = "tinklink";
 }
 
@@ -41,10 +42,11 @@ bool ConfigManager::loadConfig() {
         return loadDefaultConfig();
     }
 
-    // Parse extron config
-    if (doc["extron"].is<JsonObject>()) {
-        _extronConfig.txPin = doc["extron"]["txPin"] | 43;
-        _extronConfig.rxPin = doc["extron"]["rxPin"] | 44;
+    // Parse switcher config
+    if (doc["switcher"].is<JsonObject>()) {
+        _switcherConfig.type = doc["switcher"]["type"] | "Extron SW VGA";
+        _switcherConfig.txPin = doc["switcher"]["txPin"] | 43;
+        _switcherConfig.rxPin = doc["switcher"]["rxPin"] | 44;
     }
 
     // Parse hostname (from root or wirelessClient for backwards compatibility)
@@ -90,9 +92,10 @@ bool ConfigManager::loadDefaultConfig() {
 bool ConfigManager::saveConfig() {
     JsonDocument doc;
 
-    // Extron config
-    doc["extron"]["txPin"] = _extronConfig.txPin;
-    doc["extron"]["rxPin"] = _extronConfig.rxPin;
+    // Switcher config
+    doc["switcher"]["type"] = _switcherConfig.type;
+    doc["switcher"]["txPin"] = _switcherConfig.txPin;
+    doc["switcher"]["rxPin"] = _switcherConfig.rxPin;
 
     // Hostname
     doc["hostname"] = _wifiConfig.hostname;

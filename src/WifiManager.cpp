@@ -1,5 +1,5 @@
-#include "wifi_manager.h"
-#include "logger.h"
+#include "WifiManager.h"
+#include "Logger.h"
 
 WifiManager::WifiManager()
     : _state(State::DISCONNECTED)

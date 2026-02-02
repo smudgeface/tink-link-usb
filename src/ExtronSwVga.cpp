@@ -1,5 +1,5 @@
-#include "extron_sw_vga.h"
-#include "logger.h"
+#include "ExtronSwVga.h"
+#include "Logger.h"
 #include <HardwareSerial.h>
 
 // Use UART1 for Extron communication

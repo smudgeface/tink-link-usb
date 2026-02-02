@@ -1,5 +1,5 @@
-#include "retrotink.h"
-#include "logger.h"
+#include "RetroTink.h"
+#include "Logger.h"
 
 RetroTink::RetroTink()
     : _lastCommand("")

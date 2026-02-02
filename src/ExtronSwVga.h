@@ -81,6 +81,12 @@ public:
     /** Clear the received message history. */
     void clearRecentMessages();
 
+    /**
+     * Get the human-readable type name for this switcher.
+     * @return Type name string (e.g., "Extron SW VGA")
+     */
+    static const char* getTypeName() { return "Extron SW VGA"; }
+
 private:
     uint8_t _txPin;
     uint8_t _rxPin;

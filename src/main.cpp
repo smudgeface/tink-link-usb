@@ -1,11 +1,11 @@
 #include <Arduino.h>
 #include <FastLED.h>
-#include "config_manager.h"
-#include "extron_sw_vga.h"
-#include "retrotink.h"
-#include "wifi_manager.h"
-#include "web_server.h"
-#include "logger.h"
+#include "ConfigManager.h"
+#include "ExtronSwVga.h"
+#include "RetroTink.h"
+#include "WifiManager.h"
+#include "WebServer.h"
+#include "Logger.h"
 #include "version.h"
 
 // WS2812 RGB LED on GPIO21 (Waveshare ESP32-S3-Zero)
@@ -123,7 +123,7 @@ void setup() {
     }
 
     // Get pin configurations
-    auto extronConfig = configManager.getExtronConfig();
+    auto switcherConfig = configManager.getSwitcherConfig();
     auto wifiConfig = configManager.getWifiConfig();
 
     // Initialize RetroTINK controller (stub mode for now)
@@ -136,9 +136,9 @@ void setup() {
         tink->addTrigger(trigger);
     }
 
-    // Initialize Extron switcher
-    LOG_INFO("[3/5] Initializing Extron SW VGA...");
-    extron = new ExtronSwVga(extronConfig.txPin, extronConfig.rxPin, 9600);
+    // Initialize video switcher
+    LOG_INFO("[3/5] Initializing %s...", switcherConfig.type.c_str());
+    extron = new ExtronSwVga(switcherConfig.txPin, switcherConfig.rxPin, 9600);
     if (!extron->begin()) {
         LOG_ERROR("Failed to initialize Extron handler!");
     }
@@ -195,8 +195,8 @@ void setup() {
     LOG_RAW("========================================\n");
     LOG_RAW("\n");
     LOG_INFO("Pin assignments:");
-    LOG_INFO("  Extron TX:    GPIO%d", extronConfig.txPin);
-    LOG_INFO("  Extron RX:    GPIO%d", extronConfig.rxPin);
+    LOG_INFO("  Switcher TX:  GPIO%d", switcherConfig.txPin);
+    LOG_INFO("  Switcher RX:  GPIO%d", switcherConfig.rxPin);
     LOG_INFO("  RGB LED:      GPIO%d", RGB_LED_PIN);
     LOG_INFO("USB Mode: CDC (Serial debugging enabled)");
     LOG_INFO("Note: USB Host for RetroTINK not yet implemented");

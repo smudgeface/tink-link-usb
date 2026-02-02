@@ -1,4 +1,4 @@
-#include "logger.h"
+#include "Logger.h"
 #include <stdarg.h>
 
 Logger& Logger::instance() {

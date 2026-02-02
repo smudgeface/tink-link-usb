@@ -1,5 +1,6 @@
 {
-    "extron": {
+    "switcher": {
+        "type": "Extron SW VGA",
         "txPin": 43,
         "rxPin": 44
     },

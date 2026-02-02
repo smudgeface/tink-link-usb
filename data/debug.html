@@ -325,11 +325,11 @@
             appendToConsole(command, 'tx-' + target);
 
             // Route to appropriate API
-            let apiUrl = '/api/uart/send';
+            let apiUrl = '/api/switcher/send';
             let bodyParam = 'message';
 
             if (target === 'tink') {
-                apiUrl = '/api/debug/send';  // Uses RetroTINK stub for now
+                apiUrl = '/api/tink/send';
                 bodyParam = 'command';
             }
 
@@ -366,9 +366,9 @@
         }
 
         function refreshConsoleMessages() {
-            // Fetch both UART messages and system logs
+            // Fetch both switcher messages and system logs
             Promise.all([
-                fetch('/api/uart/receive?count=50').then(r => r.json()),
+                fetch('/api/switcher/receive?count=50').then(r => r.json()),
                 fetch('/api/logs?since=' + lastLogCount + '&count=50').then(r => r.json())
             ])
             .then(([uartData, logData]) => {
@@ -400,7 +400,7 @@
 
             // Clear server-side messages and logs
             Promise.all([
-                fetch('/api/uart/receive?clear=1'),
+                fetch('/api/switcher/receive?clear=1'),
                 fetch('/api/logs?clear=1')
             ])
             .then(() => {
