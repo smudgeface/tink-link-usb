@@ -233,21 +233,29 @@ pio device monitor -e esp32s3
 
 Press `Ctrl+C` to exit the monitor.
 
-#### Step 7: Configure WiFi
+#### Step 7: Configure WiFi (Optional)
 
 On first boot, the device starts in Access Point (AP) mode:
 
 1. Look for the **blue blinking LED** on the ESP32-S3-Zero
 2. Connect to the WiFi network named **`TinkLink-XXXXXX`** (no password)
 3. Your device should auto-assign an IP via DHCP (192.168.1.100-200 range)
-4. Open a web browser and navigate to **`http://192.168.1.1`**
+4. Open a web browser and navigate to **`http://tinklink.local`** or **`http://192.168.1.1`**
 5. Use the web interface to scan for networks and connect to your 2.4GHz WiFi
+
+**Note:** You can leave the device permanently in AP mode if you prefer. This is useful if:
+- You don't want TinkLink on your home network
+- You only need occasional access for status checks or configuration
+- Your setup location doesn't have WiFi coverage
 
 #### Step 8: Access Web Interface
 
-After WiFi is configured:
-- The LED will turn **solid green** when connected
-- Access the device at **`http://tinklink.local`** (via mDNS)
+**In AP Mode** (blue blinking LED):
+- Connect to the `TinkLink-XXXXXX` WiFi network
+- Access at **`http://tinklink.local`** or **`http://192.168.1.1`**
+
+**In Station Mode** (green solid LED):
+- Access at **`http://tinklink.local`** (via mDNS)
 - Or use the IP address assigned by your router
 
 ### Complete Build & Upload Commands

@@ -289,14 +289,16 @@ bool WifiManager::startAccessPoint() {
 
     setState(State::AP_ACTIVE);
 
+    // Enable mDNS in AP mode so tinklink.local works
+    setupMDNS();
+
     LOG_RAW("========================================\n");
     LOG_RAW("  Access Point Active\n");
     LOG_RAW("========================================\n");
     LOG_INFO("  SSID:     %s", _apConfig.ssid.c_str());
     LOG_INFO("  IP:       %s", _apConfig.ip.toString().c_str());
+    LOG_INFO("  URL:      http://%s.local or http://%s", _hostname.c_str(), _apConfig.ip.toString().c_str());
     LOG_INFO("  Security: Open (no password)");
-    LOG_INFO("Connect to this network and browse to:");
-    LOG_INFO("  http://%s", _apConfig.ip.toString().c_str());
     LOG_RAW("========================================\n");
 
     return true;
