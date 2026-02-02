@@ -13,7 +13,7 @@
 - ESP32-S3FH4R2 dual-core @ 240MHz
 - 4MB Flash, 2MB PSRAM
 - USB OTG on GPIO19/20 (internal to Type-C port)
-- Extron UART on GPIO17 (TX) / GPIO18 (RX)
+- Extron UART0 on GPIO43 (TX) / GPIO44 (RX)
 - WS2812B RGB LED on GPIO21
 
 **Reference Documentation**: See [README.md](README.md) for:
@@ -524,24 +524,21 @@ RetroTink::RetroTink(UsbHostFtdi* usbSerial)
 
 ## Phase 4: Testing and Validation
 
-### 4.1: UART Loopback Test (Extron)
+### 4.1: UART Loopback Test (Extron) ✅ COMPLETED
 
 **Goal**: Verify Extron UART hardware before RS-232 integration
 
 **Setup**:
-- Jumper GPIO17 to GPIO18 on ESP32-S3-Zero
-- Same approach as tink-link-lite testing
+- Jumper GPIO43 to GPIO44 on ESP32-S3-Zero (UART0)
 
 **Test Procedure**:
-1. Add loopback echo code to `extron_sw_vga.cpp::update()`
-2. Build and upload firmware
-3. Monitor serial output for echoed characters
-4. Verify 9600 baud timing is correct
-5. Remove loopback code after verification
+1. Install jumper between GPIO43 (TX) and GPIO44 (RX)
+2. Use web console UART test endpoints to send/receive
+3. Verify 9600 baud timing is correct
 
 **Success Criteria**:
-- Characters sent on TX (GPIO17) received on RX (GPIO18)
-- Clean UART waveform (if oscilloscope available)
+- ✅ Characters sent on TX (GPIO43) received on RX (GPIO44)
+- ✅ Loopback verified working
 
 ### 4.2: USB Host Integration Test
 

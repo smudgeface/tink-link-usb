@@ -114,14 +114,6 @@ void WebServer::setupRoutes() {
         [this](AsyncWebServerRequest* request) { handleNotFound(request); });
 }
 
-void WebServer::handleRoot(AsyncWebServerRequest* request) {
-    request->send(LittleFS, "/index.html", "text/html");
-}
-
-void WebServer::handleConfigPage(AsyncWebServerRequest* request) {
-    request->send(LittleFS, "/config.html", "text/html");
-}
-
 void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
     JsonDocument doc;
 
@@ -512,12 +504,16 @@ void WebServer::handleApiOtaStatus(AsyncWebServerRequest* request) {
 
 void WebServer::handleOtaUpload(AsyncWebServerRequest* request, String filename,
                                  size_t index, uint8_t* data, size_t len, bool final) {
+    // Track progress percentage for logging (reset each upload)
+    static int lastPercent = -1;
+
     // First chunk - initialize update
     if (index == 0) {
         _otaError = "";
         _otaProgress = 0;
         _otaTotal = request->contentLength();
         _otaInProgress = true;
+        lastPercent = -1;  // Reset progress tracking for new upload
 
         // Determine update type from query parameter or filename
         _otaMode = OTAMode::FIRMWARE;
@@ -560,7 +556,6 @@ void WebServer::handleOtaUpload(AsyncWebServerRequest* request, String filename,
         _otaProgress += len;
 
         // Log progress every 10%
-        static int lastPercent = -1;
         int percent = (_otaTotal > 0) ? (int)((_otaProgress * 100) / _otaTotal) : 0;
         if (percent / 10 > lastPercent / 10) {
             LOG_INFO("OTA: Progress %d%%", percent);

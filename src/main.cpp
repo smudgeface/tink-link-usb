@@ -27,7 +27,29 @@ bool ledManualMode = false;
 unsigned long ledManualModeStart = 0;
 const unsigned long LED_MANUAL_TIMEOUT = 10000;  // 10 seconds
 
-// LED control callback for web interface
+/**
+ * Get the LED color for a given WiFi state.
+ * Used to map WiFi connection states to status LED colors.
+ * @param state The current WiFi state
+ * @return CRGB color value for the LED
+ */
+CRGB getColorForWifiState(WifiManager::State state) {
+    switch (state) {
+        case WifiManager::State::CONNECTED:   return CRGB::Green;
+        case WifiManager::State::CONNECTING:  return CRGB::Yellow;
+        case WifiManager::State::FAILED:      return CRGB::Red;
+        case WifiManager::State::AP_ACTIVE:   return CRGB::Blue;
+        case WifiManager::State::DISCONNECTED:
+        default:                              return CRGB::Black;
+    }
+}
+
+/**
+ * LED control callback for web interface.
+ * @param r Red value (0-255), or -1 to reset to WiFi state mode
+ * @param g Green value (0-255), or -1 to reset
+ * @param b Blue value (0-255), or -1 to reset
+ */
 void setLEDColor(int r, int g, int b) {
     if (r == -1 && g == -1 && b == -1) {
         // Reset to WiFi mode
@@ -35,18 +57,7 @@ void setLEDColor(int r, int g, int b) {
         LOG_DEBUG("LED: Manual mode disabled - returning to WiFi state indication");
 
         // Immediately update LED to current WiFi state
-        WifiManager::State currentState = wifiManager.getState();
-        if (currentState == WifiManager::State::CONNECTED) {
-            leds[0] = CRGB::Green;
-        } else if (currentState == WifiManager::State::CONNECTING) {
-            leds[0] = CRGB::Yellow;
-        } else if (currentState == WifiManager::State::FAILED) {
-            leds[0] = CRGB::Red;
-        } else if (currentState == WifiManager::State::AP_ACTIVE) {
-            leds[0] = CRGB::Blue;
-        } else {
-            leds[0] = CRGB::Black;
-        }
+        leds[0] = getColorForWifiState(wifiManager.getState());
         FastLED.show();
     } else {
         // Set manual color
@@ -210,23 +221,8 @@ void loop() {
         LOG_DEBUG("LED: Manual mode timeout - returning to WiFi state indication");
 
         // Force LED update to current WiFi state
-        WifiManager::State currentState = wifiManager.getState();
-        if (currentState == WifiManager::State::CONNECTED) {
-            leds[0] = CRGB::Green;
-            FastLED.show();
-        } else if (currentState == WifiManager::State::CONNECTING) {
-            leds[0] = CRGB::Yellow;
-            FastLED.show();
-        } else if (currentState == WifiManager::State::FAILED) {
-            leds[0] = CRGB::Red;
-            FastLED.show();
-        } else if (currentState == WifiManager::State::AP_ACTIVE) {
-            leds[0] = CRGB::Blue;  // Will start blinking on next loop iteration
-            FastLED.show();
-        } else {
-            leds[0] = CRGB::Black;
-            FastLED.show();
-        }
+        leds[0] = getColorForWifiState(wifiManager.getState());
+        FastLED.show();
     }
 
     // WS2812 RGB LED status indication (skip if in manual mode)
@@ -236,43 +232,21 @@ void loop() {
         static WifiManager::State lastState = WifiManager::State::DISCONNECTED;
         WifiManager::State currentState = wifiManager.getState();
 
-    // Only update LED when state changes or for blinking states
-    if (currentState == WifiManager::State::AP_ACTIVE) {
-        // Blink blue in AP mode (500ms interval)
-        if (now - lastBlink >= 500) {
-            lastBlink = now;
-            ledOn = !ledOn;
-            leds[0] = ledOn ? CRGB::Blue : CRGB::Black;
+        // Only update LED when state changes or for blinking states
+        if (currentState == WifiManager::State::AP_ACTIVE) {
+            // Blink blue in AP mode (500ms interval)
+            if (now - lastBlink >= 500) {
+                lastBlink = now;
+                ledOn = !ledOn;
+                leds[0] = ledOn ? CRGB::Blue : CRGB::Black;
+                FastLED.show();
+            }
+        } else if (lastState != currentState) {
+            // State changed - update LED to new state color
+            leds[0] = getColorForWifiState(currentState);
             FastLED.show();
         }
-    } else if (currentState == WifiManager::State::CONNECTING) {
-        // Solid yellow when connecting
-        if (lastState != currentState) {
-            leds[0] = CRGB::Yellow;
-            FastLED.show();
-        }
-    } else if (currentState == WifiManager::State::CONNECTED) {
-        // Solid green when connected
-        if (lastState != currentState) {
-            leds[0] = CRGB::Green;
-            FastLED.show();
-        }
-    } else if (currentState == WifiManager::State::FAILED) {
-        // Solid red when failed
-        if (lastState != currentState) {
-            leds[0] = CRGB::Red;
-            FastLED.show();
-        }
-    } else {
-        // Off for disconnected/other states
-        if (lastState != currentState) {
-            leds[0] = CRGB::Black;
-            FastLED.show();
-        }
-        }
+
         lastState = currentState;
     }
-
-    // Small delay to prevent tight loop
-    delay(1);
 }

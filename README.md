@@ -75,7 +75,7 @@ The **Waveshare ESP32-S3-Zero** is highly suitable for this project:
 
 **Pin Assignments for TinkLink-USB:**
 - **GPIO21**: WS2812 RGB LED (status indicator)
-- **GPIO43**: UART0 TX (Extron switcher communication)
+- **GPIO43**: UART0 TX (Extron switcher communication, 9600 baud)
 - **GPIO44**: UART0 RX (Extron switcher communication)
 - **GPIO19/20**: USB OTG (RetroTINK communication - Phase 3)
 
@@ -110,17 +110,16 @@ build_flags =
 |----------|------|-------|
 | USB Host D+ | 20 | Connected to Type-C port (USB OTG mode) |
 | USB Host D- | 19 | Connected to Type-C port (USB OTG mode) |
-| Debug UART TX | 43 | Hardware UART0 TX (for serial debugging) |
-| Debug UART RX | 44 | Hardware UART0 RX |
-| Extron TX | 17 | Hardware UART1 TX, 9600 baud |
-| Extron RX | 18 | Hardware UART1 RX |
+| Extron TX | 43 | Hardware UART0 TX, 9600 baud |
+| Extron RX | 44 | Hardware UART0 RX |
 | Status LED | 21 | WS2812B RGB LED (onboard) |
 
 **Important Notes:**
 - GPIO19/20 are internally connected to the board's Type-C USB port
-- USB OTG mode disables USB CDC debugging - use UART0 (GPIO43/44) with a USB-to-TTL adapter for debugging
+- USB OTG mode disables USB CDC debugging - use web console for debugging instead
 - GPIO33-37 are reserved for onboard PSRAM and not available
 - The Type-C port serves dual purpose: programming (Serial/JTAG mode) and USB Host (OTG mode)
+- UART0 (GPIO43/44) is used for Extron communication at 9600 baud
 
 ### Wiring Connections
 
@@ -377,20 +376,19 @@ tink-link-usb/
 ├── scripts/
 │   └── ota_upload.py          # OTA upload automation script
 ├── src/
-│   ├── main.cpp
+│   ├── main.cpp               # Application entry point
+│   ├── version.h              # Semantic version defines
 │   ├── logger.h               # Centralized logging system
 │   ├── logger.cpp
-│   ├── usb_host_ftdi.h
-│   ├── usb_host_ftdi.cpp
-│   ├── extron_sw_vga.h
+│   ├── extron_sw_vga.h        # Extron switcher UART handler
 │   ├── extron_sw_vga.cpp
-│   ├── retrotink.h
+│   ├── retrotink.h            # RetroTINK 4K controller (stub)
 │   ├── retrotink.cpp
-│   ├── wifi_manager.h
+│   ├── wifi_manager.h         # WiFi STA/AP management
 │   ├── wifi_manager.cpp
-│   ├── web_server.h
+│   ├── web_server.h           # Async web server and API
 │   ├── web_server.cpp
-│   ├── config_manager.h
+│   ├── config_manager.h       # LittleFS configuration
 │   └── config_manager.cpp
 └── data/
     ├── index.html             # Status page

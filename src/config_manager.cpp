@@ -4,8 +4,9 @@
 
 ConfigManager::ConfigManager() {
     // Default pin assignments for ESP32-S3-Zero
-    _extronConfig.txPin = 17;
-    _extronConfig.rxPin = 18;
+    // Extron uses UART0 on GPIO43 (TX) / GPIO44 (RX)
+    _extronConfig.txPin = 43;
+    _extronConfig.rxPin = 44;
     _wifiConfig.hostname = "tinklink";
 }
 
@@ -42,8 +43,8 @@ bool ConfigManager::loadConfig() {
 
     // Parse extron config
     if (doc["extron"].is<JsonObject>()) {
-        _extronConfig.txPin = doc["extron"]["txPin"] | 17;
-        _extronConfig.rxPin = doc["extron"]["rxPin"] | 18;
+        _extronConfig.txPin = doc["extron"]["txPin"] | 43;
+        _extronConfig.rxPin = doc["extron"]["rxPin"] | 44;
     }
 
     // Parse hostname (from root or wirelessClient for backwards compatibility)

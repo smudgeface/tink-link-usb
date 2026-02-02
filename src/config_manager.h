@@ -6,47 +6,107 @@
 #include <vector>
 #include "retrotink.h"
 
-// Configuration paths
+/// Path to main configuration file in LittleFS
 #define CONFIG_PATH "/config.json"
+/// Path to WiFi credentials file in LittleFS
 #define WIFI_CONFIG_PATH "/wifi.json"
 
-// Configuration manager using LittleFS
+/**
+ * Manages persistent configuration stored in LittleFS.
+ *
+ * Configuration is split into two files:
+ * - config.json: Hardware settings, triggers, hostname
+ * - wifi.json: WiFi credentials (separate for easier clearing)
+ *
+ * Usage:
+ *   ConfigManager config;
+ *   config.begin();  // Mounts LittleFS and loads config
+ *   auto wifi = config.getWifiConfig();
+ */
 class ConfigManager {
 public:
+    /**
+     * WiFi connection and network settings.
+     */
     struct WifiConfig {
-        String ssid;
-        String password;
-        String hostname;
+        String ssid;       ///< Network SSID to connect to
+        String password;   ///< Network password
+        String hostname;   ///< mDNS hostname (default: "tinklink")
     };
 
+    /**
+     * Extron switcher UART pin configuration.
+     */
     struct ExtronConfig {
-        uint8_t txPin;
-        uint8_t rxPin;
+        uint8_t txPin;  ///< UART TX pin (default: GPIO43)
+        uint8_t rxPin;  ///< UART RX pin (default: GPIO44)
     };
 
     ConfigManager();
 
+    /**
+     * Initialize LittleFS and load configuration files.
+     * Creates default config if files don't exist.
+     * @return true if LittleFS mounted successfully
+     */
     bool begin();
 
-    // Load/save main configuration
+    /**
+     * Load main configuration from CONFIG_PATH.
+     * @return true if loaded successfully, false uses defaults
+     */
     bool loadConfig();
+
+    /**
+     * Save main configuration to CONFIG_PATH.
+     * @return true if saved successfully
+     */
     bool saveConfig();
 
-    // Load/save WiFi credentials separately
+    /**
+     * Load WiFi credentials from WIFI_CONFIG_PATH.
+     * @return true if loaded successfully
+     */
     bool loadWifiConfig();
+
+    /**
+     * Save WiFi credentials to WIFI_CONFIG_PATH.
+     * @return true if saved successfully
+     */
     bool saveWifiConfig();
 
-    // Getters
+    /** @return Current WiFi configuration */
     const WifiConfig& getWifiConfig() const { return _wifiConfig; }
+
+    /** @return Current Extron pin configuration */
     const ExtronConfig& getExtronConfig() const { return _extronConfig; }
+
+    /** @return List of configured Extron input to RetroTINK profile triggers */
     const std::vector<TriggerMapping>& getTriggers() const { return _triggers; }
 
-    // Setters
+    /**
+     * Set WiFi credentials (not saved until saveWifiConfig() called).
+     * @param ssid Network SSID
+     * @param password Network password
+     */
     void setWifiCredentials(const String& ssid, const String& password);
+
+    /**
+     * Set mDNS hostname (not saved until saveConfig() called).
+     * @param hostname The hostname without .local suffix
+     */
     void setHostname(const String& hostname);
+
+    /**
+     * Set trigger mappings (not saved until saveConfig() called).
+     * @param triggers List of input-to-profile mappings
+     */
     void setTriggers(const std::vector<TriggerMapping>& triggers);
 
-    // Check if WiFi credentials are configured
+    /**
+     * Check if WiFi credentials have been configured.
+     * @return true if SSID is non-empty
+     */
     bool hasWifiCredentials() const;
 
 private:
