@@ -93,8 +93,8 @@ build_flags =
 
 **Trade-offs:**
 - ✅ USB OTG mode enables USB Host functionality for RetroTINK communication
-- ⚠️ Disables USB CDC serial debugging (use UART0 on GPIO43/44 instead)
-- ⚠️ Programming may require holding BOOT button during upload
+- ⚠️ Disables USB CDC serial debugging (use web console or `scripts/logs.py` instead)
+- ⚠️ Programming requires OTA updates or manually entering bootloader mode
 
 **References:**
 - [Waveshare ESP32-S3-Zero Wiki](https://www.waveshare.com/wiki/ESP32-S3-Zero)
@@ -309,6 +309,35 @@ python scripts/ota_upload.py firmware firmware.bin --host 192.168.1.100
 **Environment Variable (optional):**
 - `TINKLINK_HOST` - Override device hostname/IP (default: `tinklink.local`). Useful if mDNS isn't working on your network or you prefer using a static IP. PlatformIO custom targets don't accept command-line arguments, so this env variable is the only way to specify a different host.
 
+### Remote Log Monitoring
+
+When USB CDC is disabled (USB OTG mode for USB Host), you can monitor device logs remotely via the HTTP API using the `scripts/logs.py` utility:
+
+```bash
+# Tail logs continuously (Ctrl+C to stop)
+python scripts/logs.py
+
+# Show 50 most recent log entries
+python scripts/logs.py -n 50
+
+# Clear the log buffer
+python scripts/logs.py --clear
+
+# Use a specific IP address
+python scripts/logs.py --host 192.168.1.100
+
+# Or use environment variable
+TINKLINK_HOST=192.168.1.100 python scripts/logs.py
+```
+
+**Features:**
+- Color-coded output by log level (gray=DEBUG, default=INFO, yellow=WARN, red=ERROR)
+- Continuous tailing with 1-second polling interval
+- Timestamps in seconds since device boot
+- Same `TINKLINK_HOST` environment variable as OTA scripts
+
+Logs can also be viewed in the web interface at `http://tinklink.local` → Debug page.
+
 ## Troubleshooting
 
 ### Device Won't Boot / Boot Loop
@@ -374,7 +403,8 @@ tink-link-usb/
 ├── implementation-plan.md
 ├── platformio.ini
 ├── scripts/
-│   └── ota_upload.py          # OTA upload automation script
+│   ├── ota_upload.py          # OTA firmware/filesystem upload
+│   └── logs.py                # Remote log monitoring
 ├── src/
 │   ├── main.cpp               # Application entry point
 │   ├── version.h              # Semantic version defines
