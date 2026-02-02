@@ -4,6 +4,7 @@
 #include "extron_sw_vga.h"
 #include "retrotink.h"
 #include "logger.h"
+#include "version.h"
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <Update.h>
@@ -123,6 +124,9 @@ void WebServer::handleConfigPage(AsyncWebServerRequest* request) {
 
 void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
     JsonDocument doc;
+
+    // Version
+    doc["version"] = TINKLINK_VERSION_STRING;
 
     // WiFi status
     doc["wifi"]["connected"] = _wifi->isConnected();

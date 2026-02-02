@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>TinkLink-USB</h1>
+        <h1>TinkLink-USB <span id="version" class="version"></span></h1>
 
         <nav>
             <a href="/">Status</a>
@@ -528,6 +528,14 @@
         // Initialize on page load
         window.addEventListener('load', () => {
             document.getElementById('console-input').focus();
+
+            // Fetch version
+            fetch('/api/status')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('version').textContent = 'v' + data.version;
+            });
+
             // Load recent logs to show startup messages
             fetch('/api/logs?count=50')
             .then(r => r.json())

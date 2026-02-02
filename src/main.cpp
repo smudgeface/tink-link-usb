@@ -6,6 +6,7 @@
 #include "wifi_manager.h"
 #include "web_server.h"
 #include "logger.h"
+#include "version.h"
 
 // WS2812 RGB LED on GPIO21 (Waveshare ESP32-S3-Zero)
 #define RGB_LED_PIN 21
@@ -74,7 +75,7 @@ void setup() {
 
     LOG_RAW("\n");
     LOG_RAW("========================================\n");
-    LOG_RAW("  TinkLink-USB v1.0.0\n");
+    LOG_INFO("  TinkLink-USB v%s", TINKLINK_VERSION_STRING);
     LOG_RAW("  ESP32-S3 RetroTINK 4K Controller\n");
     LOG_RAW("========================================\n");
     LOG_RAW("\n");

@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>TinkLink-USB</h1>
+        <h1>TinkLink-USB <span id="version" class="version"></span></h1>
 
         <nav>
             <a href="/">Status</a>
@@ -95,6 +95,9 @@
             fetch('/api/status')
                 .then(response => response.json())
                 .then(data => {
+                    // Version
+                    document.getElementById('version').textContent = 'v' + data.version;
+
                     const wifiStatus = document.getElementById('wifi-status');
                     wifiStatus.textContent = data.wifi.state;
                     wifiStatus.className = 'status-value ' + data.wifi.state;
