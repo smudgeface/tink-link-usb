@@ -200,11 +200,54 @@ def ota_upload_filesystem(source, target, env):
         env.Exit(1)
 
 
+# Post-build action: Copy binaries to bin/ folder for easy access
+def copy_binaries_post_build(source, target, env):
+    """Copy firmware.bin to bin/ folder after successful build"""
+    import shutil
+
+    project_dir = env.subst("$PROJECT_DIR")
+    build_dir = env.subst("$BUILD_DIR")
+    bin_dir = os.path.join(project_dir, "bin")
+
+    # Create bin/ directory if it doesn't exist
+    os.makedirs(bin_dir, exist_ok=True)
+
+    # Copy firmware.bin
+    firmware_src = os.path.join(build_dir, "firmware.bin")
+    if os.path.exists(firmware_src):
+        firmware_dst = os.path.join(bin_dir, "firmware.bin")
+        shutil.copy2(firmware_src, firmware_dst)
+        print(f"Copied firmware.bin to bin/")
+
+
+def copy_filesystem_post_build(source, target, env):
+    """Copy littlefs.bin to bin/ folder after filesystem build"""
+    import shutil
+
+    project_dir = env.subst("$PROJECT_DIR")
+    build_dir = env.subst("$BUILD_DIR")
+    bin_dir = os.path.join(project_dir, "bin")
+
+    # Create bin/ directory if it doesn't exist
+    os.makedirs(bin_dir, exist_ok=True)
+
+    # Copy littlefs.bin
+    fs_src = os.path.join(build_dir, "littlefs.bin")
+    if os.path.exists(fs_src):
+        fs_dst = os.path.join(bin_dir, "littlefs.bin")
+        shutil.copy2(fs_src, fs_dst)
+        print(f"Copied littlefs.bin to bin/")
+
+
 # Called by PlatformIO when script is loaded
 Import = None  # Placeholder for PlatformIO's Import function
 try:
     from SCons.Script import Import
     Import("env")
+
+    # Register post-build actions to copy binaries to bin/ folder
+    env.AddPostAction("$BUILD_DIR/firmware.bin", copy_binaries_post_build)
+    env.AddPostAction("$BUILD_DIR/littlefs.bin", copy_filesystem_post_build)
 
     # Register custom targets
     env.AddCustomTarget(

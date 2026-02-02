@@ -3,6 +3,7 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+.DS_Store
 *.o
 *.obj
 *.elf
@@ -12,4 +13,5 @@
 *.hex
 *.lss
 *.sym
+bin/
 data/wifi.json
