@@ -15,20 +15,15 @@
         }
         .api-method {
             display: inline-block;
-            padding: 2px 8px;
+            padding: 3px 8px;
             border-radius: 3px;
             font-size: 0.75em;
             font-weight: bold;
             margin-right: 8px;
+            font-family: 'Courier New', monospace;
         }
-        .api-method.get {
-            background: #28a745;
-            color: #fff;
-        }
-        .api-method.post {
-            background: #007bff;
-            color: #fff;
-        }
+        .api-method.get { background: #28a745; color: #fff; }
+        .api-method.post { background: #007bff; color: #fff; }
         .api-path {
             font-family: 'Courier New', monospace;
             font-size: 1em;
@@ -39,13 +34,15 @@
             margin: 10px 0;
             font-size: 0.9em;
         }
-        .api-params {
-            margin-top: 10px;
+        .api-section {
+            margin-top: 12px;
         }
-        .api-params h4 {
-            font-size: 0.85em;
+        .api-section h4 {
+            font-size: 0.8em;
             color: #888;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         .param-table {
             width: 100%;
@@ -54,14 +51,15 @@
         }
         .param-table th {
             text-align: left;
-            padding: 5px 10px 5px 0;
-            color: #888;
+            padding: 6px 10px 6px 0;
+            color: #666;
             font-weight: normal;
             border-bottom: 1px solid #333;
         }
         .param-table td {
-            padding: 5px 10px 5px 0;
+            padding: 6px 10px 6px 0;
             border-bottom: 1px solid #222;
+            vertical-align: top;
         }
         .param-name {
             font-family: 'Courier New', monospace;
@@ -69,54 +67,63 @@
         }
         .param-type {
             color: #4ec9b0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
         }
         .param-required {
             color: #f14c4c;
-            font-size: 0.8em;
+            font-size: 0.75em;
+            margin-left: 4px;
         }
         .api-example {
-            margin-top: 10px;
-            background: #1e1e1e;
+            background: #1a1a2e;
             border-radius: 4px;
-            padding: 10px;
+            padding: 12px;
             font-family: 'Courier New', monospace;
             font-size: 0.8em;
-            color: #d4d4d4;
+            color: #9cdcfe;
             overflow-x: auto;
-        }
-        .api-example-label {
-            font-size: 0.75em;
-            color: #666;
-            margin-bottom: 5px;
+            white-space: pre;
+            line-height: 1.4;
         }
         .try-btn {
-            font-size: 0.75em;
-            padding: 4px 10px;
+            font-size: 0.7em;
+            padding: 3px 8px;
             margin-left: 10px;
+            vertical-align: middle;
         }
         #response-area {
             margin-top: 15px;
-            background: #1e1e1e;
+            background: #1a1a2e;
             border-radius: 4px;
             padding: 15px;
             font-family: 'Courier New', monospace;
             font-size: 0.85em;
-            color: #d4d4d4;
+            color: #9cdcfe;
             white-space: pre-wrap;
             word-wrap: break-word;
             max-height: 300px;
             overflow-y: auto;
             display: none;
+            border: 1px solid #333;
         }
-        .section-nav {
+        .toc {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .toc a {
+            display: inline-block;
+            padding: 6px 12px;
             background: #0f0f23;
-            padding: 10px 15px;
             border-radius: 4px;
-            margin-bottom: 20px;
+            color: #00d4ff;
+            text-decoration: none;
             font-size: 0.85em;
         }
-        .section-nav a {
-            margin-right: 15px;
+        .toc a:hover {
+            background: #1f3460;
         }
     </style>
 </head>
@@ -133,12 +140,12 @@
 
         <div class="card">
             <h2>REST API Reference</h2>
-            <p style="color: #888; font-size: 0.9em;">
-                All endpoints return JSON. POST requests accept <code>application/x-www-form-urlencoded</code> parameters.
+            <p style="color: #888; font-size: 0.9em; margin-bottom: 15px;">
+                All endpoints return JSON. POST requests accept <code style="background: #0f0f23; padding: 2px 6px; border-radius: 3px;">application/x-www-form-urlencoded</code> parameters.
+                All successful responses include <code style="background: #0f0f23; padding: 2px 6px; border-radius: 3px;">"status": "ok"</code>.
             </p>
 
-            <div class="section-nav">
-                <strong>Sections:</strong>
+            <div class="toc">
                 <a href="#status">Status</a>
                 <a href="#wifi">WiFi</a>
                 <a href="#debug">Debug</a>
@@ -159,8 +166,9 @@
                 <span class="api-path">/api/status</span>
                 <button class="secondary try-btn" onclick="tryApi('GET', '/api/status')">Try</button>
                 <p class="api-desc">Get system status including WiFi, Extron input, and trigger configuration.</p>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
   "version": "1.2.0",
   "wifi": {
     "connected": true,
@@ -170,10 +178,17 @@
     "state": "connected",
     "mode": "sta"
   },
-  "extron": { "currentInput": 1 },
-  "tink": { "lastCommand": "SVS NEW INPUT=1" },
-  "triggers": [...]
+  "extron": {
+    "currentInput": 1
+  },
+  "tink": {
+    "lastCommand": "SVS NEW INPUT=1"
+  },
+  "triggers": [
+    { "input": 1, "profile": 1, "mode": "SVS", "name": "NES" }
+  ]
 }</div>
+                </div>
             </div>
         </div>
 
@@ -183,58 +198,82 @@
 
             <div class="api-endpoint">
                 <span class="api-method get">GET</span>
-                <span class="api-path">/api/scan</span>
-                <button class="secondary try-btn" onclick="tryApi('GET', '/api/scan')">Try</button>
-                <p class="api-desc">Scan for available WiFi networks. First call starts scan, subsequent calls return results.</p>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{
+                <span class="api-path">/api/wifi/scan</span>
+                <button class="secondary try-btn" onclick="tryApi('GET', '/api/wifi/scan')">Try</button>
+                <p class="api-desc">Scan for available WiFi networks. First call starts scan, subsequent calls return results when ready.</p>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
   "status": "complete",
   "networks": [
     { "ssid": "MyNetwork", "rssi": -65, "secure": true },
     { "ssid": "Guest", "rssi": -80, "secure": false }
   ]
 }</div>
+                </div>
             </div>
 
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
-                <span class="api-path">/api/connect</span>
-                <p class="api-desc">Connect to a WiFi network. Does not save credentials.</p>
-                <div class="api-params">
-                    <h4>Parameters:</h4>
+                <span class="api-path">/api/wifi/connect</span>
+                <p class="api-desc">Connect to a WiFi network. Does not save credentials to flash.</p>
+                <div class="api-section">
+                    <h4>Parameters</h4>
                     <table class="param-table">
                         <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-                        <tr><td class="param-name">ssid</td><td class="param-type">string</td><td>Network SSID <span class="param-required">required</span></td></tr>
-                        <tr><td class="param-name">password</td><td class="param-type">string</td><td>Network password</td></tr>
+                        <tr>
+                            <td><span class="param-name">ssid</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>Network SSID<span class="param-required">required</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">password</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>Network password (optional for open networks)</td>
+                        </tr>
                     </table>
                 </div>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{ "status": "connecting" }</div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{ "status": "ok" }</div>
+                </div>
             </div>
 
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
-                <span class="api-path">/api/disconnect</span>
-                <button class="secondary try-btn" onclick="tryApi('POST', '/api/disconnect')">Try</button>
+                <span class="api-path">/api/wifi/disconnect</span>
+                <button class="secondary try-btn" onclick="tryApi('POST', '/api/wifi/disconnect')">Try</button>
                 <p class="api-desc">Disconnect from current WiFi network.</p>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{ "status": "disconnected" }</div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{ "status": "ok" }</div>
+                </div>
             </div>
 
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
-                <span class="api-path">/api/save</span>
+                <span class="api-path">/api/wifi/save</span>
                 <p class="api-desc">Save WiFi credentials to flash. Device will use these on boot.</p>
-                <div class="api-params">
-                    <h4>Parameters:</h4>
+                <div class="api-section">
+                    <h4>Parameters</h4>
                     <table class="param-table">
                         <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-                        <tr><td class="param-name">ssid</td><td class="param-type">string</td><td>Network SSID <span class="param-required">required</span></td></tr>
-                        <tr><td class="param-name">password</td><td class="param-type">string</td><td>Network password</td></tr>
+                        <tr>
+                            <td><span class="param-name">ssid</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>Network SSID<span class="param-required">required</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">password</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>Network password</td>
+                        </tr>
                     </table>
                 </div>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{ "status": "saved" }</div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{ "status": "ok" }</div>
+                </div>
             </div>
         </div>
 
@@ -245,48 +284,62 @@
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/debug/send</span>
-                <p class="api-desc">Send a command to RetroTINK (currently stub mode - logged only).</p>
-                <div class="api-params">
-                    <h4>Parameters:</h4>
+                <p class="api-desc">Send a command to RetroTINK 4K (currently stub mode - logged only until USB Host is implemented).</p>
+                <div class="api-section">
+                    <h4>Parameters</h4>
                     <table class="param-table">
                         <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-                        <tr><td class="param-name">command</td><td class="param-type">string</td><td>Command to send (e.g., "remote prof1", "SVS NEW INPUT=1") <span class="param-required">required</span></td></tr>
+                        <tr>
+                            <td><span class="param-name">command</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>Command to send (e.g., "remote prof1", "SVS NEW INPUT=1")<span class="param-required">required</span></td>
+                        </tr>
                     </table>
                 </div>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{ "status": "sent", "command": "remote prof1" }</div>
-            </div>
-
-            <div class="api-endpoint">
-                <span class="api-method post">POST</span>
-                <span class="api-path">/api/debug/continuous</span>
-                <p class="api-desc">Send continuous test signals (for oscilloscope testing).</p>
-                <div class="api-params">
-                    <h4>Parameters:</h4>
-                    <table class="param-table">
-                        <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-                        <tr><td class="param-name">count</td><td class="param-type">int</td><td>Number of signals (1-100, default: 10)</td></tr>
-                    </table>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "status": "ok",
+  "command": "remote prof1"
+}</div>
                 </div>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{ "status": "sent", "count": 10 }</div>
             </div>
 
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/debug/led</span>
-                <p class="api-desc">Control the WS2812 RGB LED. LED returns to WiFi mode after 10 seconds.</p>
-                <div class="api-params">
-                    <h4>Parameters (use one of these options):</h4>
+                <p class="api-desc">Control the WS2812 RGB LED on GPIO21. LED returns to WiFi state indication after 10 seconds.</p>
+                <div class="api-section">
+                    <h4>Parameters</h4>
+                    <p style="font-size: 0.85em; color: #888; margin-bottom: 8px;">Use one of these options:</p>
                     <table class="param-table">
                         <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-                        <tr><td class="param-name">color</td><td class="param-type">string</td><td>Named color: red, green, blue, yellow, cyan, magenta, white, off</td></tr>
-                        <tr><td class="param-name">r, g, b</td><td class="param-type">int</td><td>RGB values (0-255 each)</td></tr>
-                        <tr><td class="param-name">reset</td><td class="param-type">any</td><td>Return to WiFi state mode</td></tr>
+                        <tr>
+                            <td><span class="param-name">color</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>Named color: red, green, blue, yellow, cyan, magenta, white, off</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">r, g, b</span></td>
+                            <td><span class="param-type">int</span></td>
+                            <td>RGB values (0-255 each)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">reset</span></td>
+                            <td><span class="param-type">any</span></td>
+                            <td>Return LED to WiFi state indication mode</td>
+                        </tr>
                     </table>
                 </div>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{ "status": "ok", "r": 255, "g": 0, "b": 0 }</div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "status": "ok",
+  "r": 255,
+  "g": 0,
+  "b": 0
+}</div>
+                </div>
             </div>
         </div>
 
@@ -297,16 +350,25 @@
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/uart/send</span>
-                <p class="api-desc">Send a message via UART to Extron switcher (GPIO43 TX, 9600 baud).</p>
-                <div class="api-params">
-                    <h4>Parameters:</h4>
+                <p class="api-desc">Send a message via UART to Extron switcher (GPIO43 TX, 9600 baud). CR+LF is appended automatically.</p>
+                <div class="api-section">
+                    <h4>Parameters</h4>
                     <table class="param-table">
                         <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-                        <tr><td class="param-name">message</td><td class="param-type">string</td><td>Message to send (CR+LF appended automatically) <span class="param-required">required</span></td></tr>
+                        <tr>
+                            <td><span class="param-name">message</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>Message to send<span class="param-required">required</span></td>
+                        </tr>
                     </table>
                 </div>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{ "status": "sent", "message": "1!" }</div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "status": "ok",
+  "message": "1!"
+}</div>
+                </div>
             </div>
 
             <div class="api-endpoint">
@@ -314,19 +376,32 @@
                 <span class="api-path">/api/uart/receive</span>
                 <button class="secondary try-btn" onclick="tryApi('GET', '/api/uart/receive?count=10')">Try</button>
                 <p class="api-desc">Get recent messages received from Extron switcher.</p>
-                <div class="api-params">
-                    <h4>Parameters:</h4>
+                <div class="api-section">
+                    <h4>Parameters</h4>
                     <table class="param-table">
                         <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-                        <tr><td class="param-name">count</td><td class="param-type">int</td><td>Max messages to return (1-50, default: 10)</td></tr>
-                        <tr><td class="param-name">clear</td><td class="param-type">any</td><td>If present, clear message buffer</td></tr>
+                        <tr>
+                            <td><span class="param-name">count</span></td>
+                            <td><span class="param-type">int</span></td>
+                            <td>Max messages to return (1-50, default: 10)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">clear</span></td>
+                            <td><span class="param-type">any</span></td>
+                            <td>If present, clear message buffer after reading</td>
+                        </tr>
                     </table>
                 </div>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
   "count": 2,
-  "messages": ["In1 All", "In2 All"]
+  "messages": [
+    "In1 All",
+    "In2 All"
+  ]
 }</div>
+                </div>
             </div>
         </div>
 
@@ -338,28 +413,42 @@
                 <span class="api-method get">GET</span>
                 <span class="api-path">/api/logs</span>
                 <button class="secondary try-btn" onclick="tryApi('GET', '/api/logs?count=10')">Try</button>
-                <p class="api-desc">Get system log entries. Supports incremental fetching via <code>since</code> parameter.</p>
-                <div class="api-params">
-                    <h4>Parameters:</h4>
+                <p class="api-desc">Get system log entries. Use <code>since</code> parameter for incremental polling.</p>
+                <div class="api-section">
+                    <h4>Parameters</h4>
                     <table class="param-table">
                         <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-                        <tr><td class="param-name">count</td><td class="param-type">int</td><td>Max entries to return (1-100, default: 50)</td></tr>
-                        <tr><td class="param-name">since</td><td class="param-type">int</td><td>Return logs after this index (from previous <code>total</code>)</td></tr>
-                        <tr><td class="param-name">clear</td><td class="param-type">any</td><td>If present, clear log buffer</td></tr>
+                        <tr>
+                            <td><span class="param-name">count</span></td>
+                            <td><span class="param-type">int</span></td>
+                            <td>Max entries to return (1-100, default: 50)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">since</span></td>
+                            <td><span class="param-type">int</span></td>
+                            <td>Return logs after this index (use <code>total</code> from previous response)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">clear</span></td>
+                            <td><span class="param-type">any</span></td>
+                            <td>If present, clear log buffer</td>
+                        </tr>
                     </table>
                 </div>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
   "total": 42,
-  "count": 10,
+  "count": 2,
   "logs": [
     { "ts": 3600, "lvl": 1, "msg": "WiFi: Connected!" },
-    { "ts": 3650, "lvl": 0, "msg": "Debug message..." }
+    { "ts": 3650, "lvl": 0, "msg": "Debug message" }
   ]
 }
 
-Log levels: 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
-Timestamp (ts) is milliseconds since boot</div>
+// Log levels: 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
+// ts = milliseconds since boot</div>
+                </div>
             </div>
         </div>
 
@@ -372,30 +461,45 @@ Timestamp (ts) is milliseconds since boot</div>
                 <span class="api-path">/api/ota/status</span>
                 <button class="secondary try-btn" onclick="tryApi('GET', '/api/ota/status')">Try</button>
                 <p class="api-desc">Get current OTA update progress.</p>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
   "inProgress": false,
   "progress": 0,
   "total": 0,
   "percent": 0,
   "error": ""
 }</div>
+                </div>
             </div>
 
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/ota/upload</span>
                 <p class="api-desc">Upload firmware or filesystem binary. Use <code>multipart/form-data</code> encoding. Device reboots on success.</p>
-                <div class="api-params">
-                    <h4>Parameters:</h4>
+                <div class="api-section">
+                    <h4>Parameters</h4>
                     <table class="param-table">
                         <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-                        <tr><td class="param-name">file</td><td class="param-type">file</td><td>Binary file (.bin) <span class="param-required">required</span></td></tr>
-                        <tr><td class="param-name">mode</td><td class="param-type">string</td><td>"firmware" or "fs" (default: firmware)</td></tr>
+                        <tr>
+                            <td><span class="param-name">file</span></td>
+                            <td><span class="param-type">file</span></td>
+                            <td>Binary file (.bin)<span class="param-required">required</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">mode</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>"firmware" or "fs" (default: firmware)</td>
+                        </tr>
                     </table>
                 </div>
-                <div class="api-example-label">Response:</div>
-                <div class="api-example">{ "status": "ok", "message": "Update successful. Rebooting..." }</div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "status": "ok",
+  "message": "Update successful. Rebooting..."
+}</div>
+                </div>
             </div>
         </div>
 
@@ -404,30 +508,44 @@ Timestamp (ts) is milliseconds since boot</div>
             <h2>Command Line Examples</h2>
             <p style="color: #888; font-size: 0.9em; margin-bottom: 15px;">Using curl from terminal:</p>
 
-            <div class="api-example-label">Get status:</div>
-            <div class="api-example">curl http://tinklink.local/api/status</div>
+            <div class="api-section">
+                <h4>Get Status</h4>
+                <div class="api-example">curl http://tinklink.local/api/status</div>
+            </div>
 
-            <div class="api-example-label" style="margin-top: 15px;">Scan for networks:</div>
-            <div class="api-example">curl http://tinklink.local/api/scan</div>
+            <div class="api-section">
+                <h4>Scan for Networks</h4>
+                <div class="api-example">curl http://tinklink.local/api/wifi/scan</div>
+            </div>
 
-            <div class="api-example-label" style="margin-top: 15px;">Connect to WiFi:</div>
-            <div class="api-example">curl -X POST http://tinklink.local/api/connect \
-  -d "ssid=MyNetwork&password=secret123"</div>
+            <div class="api-section">
+                <h4>Connect to WiFi</h4>
+                <div class="api-example">curl -X POST http://tinklink.local/api/wifi/connect \
+     -d "ssid=MyNetwork&password=secret123"</div>
+            </div>
 
-            <div class="api-example-label" style="margin-top: 15px;">Send RetroTINK command:</div>
-            <div class="api-example">curl -X POST http://tinklink.local/api/debug/send \
-  -d "command=SVS NEW INPUT=1"</div>
+            <div class="api-section">
+                <h4>Send RetroTINK Command</h4>
+                <div class="api-example">curl -X POST http://tinklink.local/api/debug/send \
+     -d "command=SVS NEW INPUT=1"</div>
+            </div>
 
-            <div class="api-example-label" style="margin-top: 15px;">Set LED color:</div>
-            <div class="api-example">curl -X POST http://tinklink.local/api/debug/led \
-  -d "color=blue"</div>
+            <div class="api-section">
+                <h4>Set LED Color</h4>
+                <div class="api-example">curl -X POST http://tinklink.local/api/debug/led \
+     -d "color=blue"</div>
+            </div>
 
-            <div class="api-example-label" style="margin-top: 15px;">Get logs:</div>
-            <div class="api-example">curl "http://tinklink.local/api/logs?count=20"</div>
+            <div class="api-section">
+                <h4>Get Logs</h4>
+                <div class="api-example">curl "http://tinklink.local/api/logs?count=20"</div>
+            </div>
 
-            <div class="api-example-label" style="margin-top: 15px;">Upload firmware via OTA:</div>
-            <div class="api-example">curl -X POST http://tinklink.local/api/ota/upload \
-  -F "file=@firmware.bin" -F "mode=firmware"</div>
+            <div class="api-section">
+                <h4>Upload Firmware via OTA</h4>
+                <div class="api-example">curl -X POST http://tinklink.local/api/ota/upload \
+     -F "file=@firmware.bin" -F "mode=firmware"</div>
+            </div>
         </div>
     </div>
 
@@ -448,11 +566,9 @@ Timestamp (ts) is milliseconds since boot</div>
                     responseArea.textContent = 'Error: ' + err.message;
                 });
 
-            // Scroll to response area
             responseArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
-        // Fetch version on load
         window.addEventListener('load', () => {
             fetch('/api/status')
                 .then(r => r.json())

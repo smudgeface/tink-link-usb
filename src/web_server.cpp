@@ -52,24 +52,22 @@ void WebServer::setupRoutes() {
     _server->on("/api/status", HTTP_GET,
         [this](AsyncWebServerRequest* request) { handleApiStatus(request); });
 
-    _server->on("/api/scan", HTTP_GET,
+    // WiFi endpoints
+    _server->on("/api/wifi/scan", HTTP_GET,
         [this](AsyncWebServerRequest* request) { handleApiScan(request); });
 
-    _server->on("/api/connect", HTTP_POST,
+    _server->on("/api/wifi/connect", HTTP_POST,
         [this](AsyncWebServerRequest* request) { handleApiConnect(request); });
 
-    _server->on("/api/disconnect", HTTP_POST,
+    _server->on("/api/wifi/disconnect", HTTP_POST,
         [this](AsyncWebServerRequest* request) { handleApiDisconnect(request); });
 
-    _server->on("/api/save", HTTP_POST,
+    _server->on("/api/wifi/save", HTTP_POST,
         [this](AsyncWebServerRequest* request) { handleApiSave(request); });
 
     // Debug endpoints
     _server->on("/api/debug/send", HTTP_POST,
         [this](AsyncWebServerRequest* request) { handleApiDebugSend(request); });
-
-    _server->on("/api/debug/continuous", HTTP_POST,
-        [this](AsyncWebServerRequest* request) { handleApiDebugContinuous(request); });
 
     _server->on("/api/debug/led", HTTP_POST,
         [this](AsyncWebServerRequest* request) { handleApiDebugLED(request); });
@@ -226,7 +224,7 @@ void WebServer::handleApiConnect(AsyncWebServerRequest* request) {
     LOG_INFO("WebServer: Connect request for '%s'", ssid.c_str());
 
     if (_wifi->connect(ssid, password)) {
-        request->send(200, "application/json", "{\"status\":\"connecting\"}");
+        request->send(200, "application/json", "{\"status\":\"ok\"}");
     } else {
         request->send(500, "application/json", "{\"error\":\"Failed to start connection\"}");
     }
@@ -234,7 +232,7 @@ void WebServer::handleApiConnect(AsyncWebServerRequest* request) {
 
 void WebServer::handleApiDisconnect(AsyncWebServerRequest* request) {
     _wifi->disconnect();
-    request->send(200, "application/json", "{\"status\":\"disconnected\"}");
+    request->send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
 void WebServer::handleApiSave(AsyncWebServerRequest* request) {
@@ -255,7 +253,7 @@ void WebServer::handleApiSave(AsyncWebServerRequest* request) {
 
     _config->setWifiCredentials(ssid, password);
     if (_config->saveWifiConfig()) {
-        request->send(200, "application/json", "{\"status\":\"saved\"}");
+        request->send(200, "application/json", "{\"status\":\"ok\"}");
     } else {
         request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
     }
@@ -280,32 +278,8 @@ void WebServer::handleApiDebugSend(AsyncWebServerRequest* request) {
 
     // Return success response
     JsonDocument doc;
-    doc["status"] = "sent";
+    doc["status"] = "ok";
     doc["command"] = command;
-
-    String response;
-    serializeJson(doc, response);
-    request->send(200, "application/json", response);
-}
-
-void WebServer::handleApiDebugContinuous(AsyncWebServerRequest* request) {
-    int count = 10;  // Default 10 signals
-
-    if (request->hasParam("count", true)) {
-        count = request->getParam("count", true)->value().toInt();
-        if (count < 1) count = 1;
-        if (count > 100) count = 100;  // Max 100 to prevent abuse
-    }
-
-    LOG_DEBUG("WebServer: Sending continuous test pattern (%d signals)", count);
-
-    // Send continuous test signals
-    _tink->sendContinuousTest(count);
-
-    // Return success response
-    JsonDocument doc;
-    doc["status"] = "sent";
-    doc["count"] = count;
 
     String response;
     serializeJson(doc, response);
@@ -363,7 +337,7 @@ void WebServer::handleApiDebugLED(AsyncWebServerRequest* request) {
     if (reset) {
         _ledCallback(-1, -1, -1);  // -1 = reset to WiFi mode
         LOG_DEBUG("WebServer: LED reset to WiFi mode");
-        request->send(200, "application/json", "{\"status\":\"reset\"}");
+        request->send(200, "application/json", "{\"status\":\"ok\"}");
     } else {
         _ledCallback(r, g, b);
         LOG_DEBUG("WebServer: LED set to RGB(%d,%d,%d)", r, g, b);
@@ -396,7 +370,7 @@ void WebServer::handleApiUartSend(AsyncWebServerRequest* request) {
 
     // Return success response
     JsonDocument doc;
-    doc["status"] = "sent";
+    doc["status"] = "ok";
     doc["message"] = message;
 
     String response;

@@ -35,19 +35,18 @@ enum class OTAMode {
  * - System log retrieval
  *
  * API Endpoints:
- * - GET  /api/status     - System status (WiFi, Extron, triggers)
- * - GET  /api/scan       - Scan for WiFi networks
- * - POST /api/connect    - Connect to WiFi network
- * - POST /api/disconnect - Disconnect from WiFi
- * - POST /api/save       - Save WiFi credentials
- * - POST /api/debug/send - Send command to RetroTINK
- * - POST /api/debug/continuous - Send test pattern
- * - POST /api/debug/led  - Control status LED
- * - POST /api/uart/send  - Send UART test message
- * - GET  /api/uart/receive - Get recent UART messages
- * - GET  /api/logs       - Get system logs
- * - GET  /api/ota/status - Get OTA update progress
- * - POST /api/ota/upload - Upload firmware or filesystem
+ * - GET  /api/status          - System status (WiFi, Extron, triggers)
+ * - GET  /api/wifi/scan       - Scan for WiFi networks
+ * - POST /api/wifi/connect    - Connect to WiFi network
+ * - POST /api/wifi/disconnect - Disconnect from WiFi
+ * - POST /api/wifi/save       - Save WiFi credentials
+ * - POST /api/debug/send      - Send command to RetroTINK
+ * - POST /api/debug/led       - Control status LED
+ * - POST /api/uart/send       - Send UART test message
+ * - GET  /api/uart/receive    - Get recent UART messages
+ * - GET  /api/logs            - Get system logs
+ * - GET  /api/ota/status      - Get OTA update progress
+ * - POST /api/ota/upload      - Upload firmware or filesystem
  */
 class WebServer {
 public:
@@ -102,7 +101,6 @@ private:
     void handleApiDisconnect(AsyncWebServerRequest* request);
     void handleApiSave(AsyncWebServerRequest* request);
     void handleApiDebugSend(AsyncWebServerRequest* request);
-    void handleApiDebugContinuous(AsyncWebServerRequest* request);
     void handleApiDebugLED(AsyncWebServerRequest* request);
     void handleApiUartSend(AsyncWebServerRequest* request);
     void handleApiUartReceive(AsyncWebServerRequest* request);

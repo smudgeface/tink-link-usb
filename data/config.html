@@ -135,7 +135,7 @@
             list.innerHTML = '<div class="loading"><span class="spinner"></span>Scanning...</div>';
 
             function pollScan() {
-                fetch('/api/scan')
+                fetch('/api/wifi/scan')
                     .then(response => response.json())
                     .then(data => {
                         if (data.status === 'complete') {
@@ -193,7 +193,7 @@
                 Reconnect to the TinkLink AP to try again.
             </div>`;
 
-            fetch('/api/connect', {
+            fetch('/api/wifi/connect', {
                 method: 'POST',
                 body: formData
             })
@@ -245,7 +245,7 @@
             formData.append('ssid', ssid);
             formData.append('password', password);
 
-            fetch('/api/save', {
+            fetch('/api/wifi/save', {
                 method: 'POST',
                 body: formData
             })
@@ -265,7 +265,7 @@
         }
 
         function disconnect() {
-            fetch('/api/disconnect', { method: 'POST' })
+            fetch('/api/wifi/disconnect', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     showMessage('Disconnected', 'info');
