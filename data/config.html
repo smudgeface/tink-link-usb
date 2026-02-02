@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WiFi Config - TinkLink-Lite</title>
+    <title>WiFi Config - TinkLink-USB</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>TinkLink-Lite</h1>
+        <h1>TinkLink-USB</h1>
 
         <nav>
             <a href="/">Status</a>
@@ -63,6 +63,10 @@
 
         <div class="card">
             <h2>Connect to Network</h2>
+            <div class="message info" style="margin-bottom: 15px;">
+                <strong>⚠️ Note:</strong> After connecting to a new network, the device IP address will likely change.
+                <br>Wait for the <strong>LED to turn green</strong>, then navigate to <strong>http://tinklink.local</strong>
+            </div>
             <form id="connect-form" onsubmit="return connectNetwork(event)">
                 <div class="input-group">
                     <label for="ssid">Network Name (SSID)</label>
@@ -170,6 +174,21 @@
             formData.append('ssid', ssid);
             formData.append('password', password);
 
+            // Show persistent connecting message
+            const msg = document.getElementById('message');
+            msg.innerHTML = `<div class="message info">
+                <strong>Connecting to ${ssid}...</strong><br>
+                <br>
+                The device IP address will change. This page will lose connection.<br>
+                <br>
+                <strong>Next steps:</strong><br>
+                1. Wait for the LED to turn <strong style="color: #28a745;">GREEN</strong> (connected)<br>
+                2. Navigate to <strong>http://tinklink.local</strong><br>
+                <br>
+                If the LED turns <strong style="color: #dc3545;">RED</strong>, the connection failed.
+                Reconnect to the TinkLink AP to try again.
+            </div>`;
+
             fetch('/api/connect', {
                 method: 'POST',
                 body: formData
@@ -178,13 +197,12 @@
             .then(data => {
                 if (data.error) {
                     showMessage(data.error, 'error');
-                } else {
-                    showMessage('Connecting to ' + ssid + '...', 'info');
                 }
+                // Don't overwrite the persistent message on success
             })
             .catch(err => {
-                showMessage('Connection failed', 'error');
-                console.error('Connect failed:', err);
+                // This is expected - connection will be lost
+                console.log('Connection lost (expected when changing networks)');
             });
 
             return false;
@@ -199,6 +217,26 @@
                 return;
             }
 
+            // Show confirmation dialog
+            if (!confirm(`Save WiFi credentials and connect to "${ssid}"?\n\nThe device will disconnect from the current network and the IP address will change.\n\nAfter connecting, use http://tinklink.local to access the device.`)) {
+                return;
+            }
+
+            // Show persistent message
+            const msg = document.getElementById('message');
+            msg.innerHTML = `<div class="message info">
+                <strong>Saving credentials and connecting to ${ssid}...</strong><br>
+                <br>
+                The device IP address will change. This page will lose connection.<br>
+                <br>
+                <strong>Next steps:</strong><br>
+                1. Wait for the LED to turn <strong style="color: #28a745;">GREEN</strong> (connected)<br>
+                2. Navigate to <strong>http://tinklink.local</strong><br>
+                <br>
+                If the LED turns <strong style="color: #dc3545;">RED</strong>, the connection failed.
+                Reconnect to the TinkLink AP to try again.
+            </div>`;
+
             const formData = new FormData();
             formData.append('ssid', ssid);
             formData.append('password', password);
@@ -212,14 +250,13 @@
                 if (data.error) {
                     showMessage(data.error, 'error');
                 } else {
-                    showMessage('Credentials saved. Connecting...', 'success');
                     // Also connect
                     connectNetwork(new Event('submit'));
                 }
             })
             .catch(err => {
-                showMessage('Save failed', 'error');
-                console.error('Save failed:', err);
+                // This is expected - connection will be lost
+                console.log('Connection lost (expected when changing networks)');
             });
         }
 

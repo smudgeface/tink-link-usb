@@ -1,4 +1,5 @@
 #include "retrotink.h"
+#include "logger.h"
 
 RetroTink::RetroTink()
     : _lastCommand("")
@@ -9,15 +10,15 @@ RetroTink::~RetroTink() {
 }
 
 void RetroTink::begin() {
-    Serial.println("RetroTink controller initialized (stub mode - USB Host not yet implemented)");
+    LOG_INFO("RetroTink controller initialized (stub mode - USB Host not yet implemented)");
 }
 
 void RetroTink::addTrigger(const TriggerMapping& trigger) {
     _triggers.push_back(trigger);
 
     const char* modeStr = (trigger.mode == TriggerMapping::SVS) ? "SVS" : "Remote";
-    Serial.printf("RetroTink: Added trigger - input %d -> profile %d (%s)\n",
-                  trigger.extronInput, trigger.profile, modeStr);
+    LOG_DEBUG("RetroTink: Added trigger - input %d -> profile %d (%s)",
+              trigger.extronInput, trigger.profile, modeStr);
 }
 
 void RetroTink::onExtronInputChange(int input) {
@@ -26,19 +27,19 @@ void RetroTink::onExtronInputChange(int input) {
     if (trigger) {
         String command = generateCommand(*trigger);
         sendCommand(command);
-        Serial.printf("RetroTink: Input %d triggered -> %s\n", input, command.c_str());
+        LOG_INFO("RetroTink: Input %d triggered -> %s", input, command.c_str());
     } else {
-        Serial.printf("RetroTink: No trigger defined for input %d\n", input);
+        LOG_DEBUG("RetroTink: No trigger defined for input %d", input);
     }
 }
 
 void RetroTink::sendRawCommand(const String& command) {
     sendCommand(command);
-    Serial.printf("RetroTink: Raw command sent: %s\n", command.c_str());
+    LOG_DEBUG("RetroTink: Raw command sent: %s", command.c_str());
 }
 
 void RetroTink::sendContinuousTest(int count) {
-    Serial.printf("RetroTink: Sending %d test signals (stub mode)\n", count);
+    LOG_DEBUG("RetroTink: Sending %d test signals (stub mode)", count);
     for (int i = 0; i < count; i++) {
         sendCommand("TEST");
         delay(100);
@@ -71,10 +72,10 @@ String RetroTink::generateCommand(const TriggerMapping& trigger) const {
 
 void RetroTink::sendCommand(const String& command) {
     // Phase 1: Just log what would be sent
-    // Phase 2: Will send via USB Host FTDI
-    Serial.printf("RetroTink TX (stub): [%s]\n", command.c_str());
+    // Phase 3: Will send via USB Host FTDI
+    LOG_DEBUG("RetroTink TX (stub): [%s]", command.c_str());
     _lastCommand = command;
 
-    // TODO: In Phase 2, replace with actual USB Host serial write:
+    // TODO: In Phase 3, replace with actual USB Host serial write:
     // usbSerial->println(command);
 }

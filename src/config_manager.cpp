@@ -1,4 +1,5 @@
 #include "config_manager.h"
+#include "logger.h"
 #include <LittleFS.h>
 
 ConfigManager::ConfigManager() {
@@ -10,11 +11,11 @@ ConfigManager::ConfigManager() {
 
 bool ConfigManager::begin() {
     if (!LittleFS.begin(true)) {  // true = format if mount fails
-        Serial.println("ConfigManager: Failed to mount LittleFS");
+        LOG_ERROR("ConfigManager: Failed to mount LittleFS");
         return false;
     }
 
-    Serial.println("ConfigManager: LittleFS mounted");
+    LOG_DEBUG("ConfigManager: LittleFS mounted");
 
     // Load configurations
     loadConfig();
@@ -26,7 +27,7 @@ bool ConfigManager::begin() {
 bool ConfigManager::loadConfig() {
     File file = LittleFS.open(CONFIG_PATH, "r");
     if (!file) {
-        Serial.println("ConfigManager: No config.json found, using defaults");
+        LOG_WARN("ConfigManager: No config.json found, using defaults");
         return loadDefaultConfig();
     }
 
@@ -35,7 +36,7 @@ bool ConfigManager::loadConfig() {
     file.close();
 
     if (error) {
-        Serial.printf("ConfigManager: Failed to parse config.json: %s\n", error.c_str());
+        LOG_ERROR("ConfigManager: Failed to parse config.json: %s", error.c_str());
         return loadDefaultConfig();
     }
 
@@ -68,7 +69,7 @@ bool ConfigManager::loadConfig() {
         }
     }
 
-    Serial.printf("ConfigManager: Loaded %d triggers from config\n", _triggers.size());
+    LOG_DEBUG("ConfigManager: Loaded %d triggers from config", _triggers.size());
     return true;
 }
 
@@ -107,21 +108,21 @@ bool ConfigManager::saveConfig() {
 
     File file = LittleFS.open(CONFIG_PATH, "w");
     if (!file) {
-        Serial.println("ConfigManager: Failed to open config.json for writing");
+        LOG_ERROR("ConfigManager: Failed to open config.json for writing");
         return false;
     }
 
     serializeJsonPretty(doc, file);
     file.close();
 
-    Serial.println("ConfigManager: Configuration saved");
+    LOG_INFO("ConfigManager: Configuration saved");
     return true;
 }
 
 bool ConfigManager::loadWifiConfig() {
     File file = LittleFS.open(WIFI_CONFIG_PATH, "r");
     if (!file) {
-        Serial.println("ConfigManager: No wifi.json found");
+        LOG_DEBUG("ConfigManager: No wifi.json found");
         return false;
     }
 
@@ -130,7 +131,7 @@ bool ConfigManager::loadWifiConfig() {
     file.close();
 
     if (error) {
-        Serial.printf("ConfigManager: Failed to parse wifi.json: %s\n", error.c_str());
+        LOG_ERROR("ConfigManager: Failed to parse wifi.json: %s", error.c_str());
         return false;
     }
 
@@ -141,8 +142,8 @@ bool ConfigManager::loadWifiConfig() {
         _wifiConfig.hostname = doc["hostname"].as<String>();
     }
 
-    Serial.printf("ConfigManager: WiFi config loaded (SSID: %s)\n",
-                  _wifiConfig.ssid.length() > 0 ? _wifiConfig.ssid.c_str() : "(none)");
+    LOG_DEBUG("ConfigManager: WiFi config loaded (SSID: %s)",
+              _wifiConfig.ssid.length() > 0 ? _wifiConfig.ssid.c_str() : "(none)");
     return true;
 }
 
@@ -155,14 +156,14 @@ bool ConfigManager::saveWifiConfig() {
 
     File file = LittleFS.open(WIFI_CONFIG_PATH, "w");
     if (!file) {
-        Serial.println("ConfigManager: Failed to open wifi.json for writing");
+        LOG_ERROR("ConfigManager: Failed to open wifi.json for writing");
         return false;
     }
 
     serializeJsonPretty(doc, file);
     file.close();
 
-    Serial.println("ConfigManager: WiFi configuration saved");
+    LOG_INFO("ConfigManager: WiFi configuration saved");
     return true;
 }
 

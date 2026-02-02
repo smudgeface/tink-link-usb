@@ -1,6 +1,6 @@
 # TinkLink-USB
 
-> 🚧 **Status**: Phase 1 Complete - Base framework ready, USB Host implementation next
+> 🚧 **Status**: Phase 2 Complete - WiFi, LED, Web Console, OTA Updates working. USB Host implementation next.
 
 A USB-based ESP32-S3 bridge between video switchers and the RetroTINK 4K.
 
@@ -26,6 +26,9 @@ The original [TinkLink-Lite](https://github.com/smudgeface/tink-link-lite) proje
 - **USB Host Communication** - Direct USB serial connection to RetroTINK 4K
 - **Extron SW VGA Support** - Monitors Extron SW series VGA switchers via RS-232
 - **Web Interface** - Monitor status and configure WiFi from any browser
+- **System Console** - Web-based serial console for debugging and sending commands
+- **OTA Updates** - Update firmware and filesystem over WiFi (no USB required)
+- **Centralized Logging** - Debug logs accessible via web interface and serial
 - **mDNS Support** - Access via `http://tinklink.local`
 - **Persistent Configuration** - Settings stored in flash via LittleFS
 
@@ -49,7 +52,7 @@ Supported boards (based on [EspUsbHost](https://github.com/wakwak-koba/EspUsbHos
 
 | Board | Notes |
 |-------|-------|
-| **Waveshare ESP32-S3-Zero** | ✅ **Recommended** - Compact (23.5×18mm), USB-C port, castellated holes. [Board Details](https://www.espboards.dev/esp32/esp32-s3-zero/) |
+| **Waveshare ESP32-S3-Zero** | ✅ **Recommended** - Compact (23.5×18mm), USB-C port, castellated holes. [Pinout](https://www.espboards.dev/esp32/esp32-s3-zero/) • [Wiki](https://www.waveshare.com/wiki/ESP32-S3-Zero) |
 | **ESP32-S3-DevKitC-1** | Standard development board, readily available |
 | **M5Stack ATOMS3** | Compact form factor with built-in display |
 | **M5Stack StampS3** | Ultra-compact module |
@@ -65,9 +68,16 @@ The **Waveshare ESP32-S3-Zero** is highly suitable for this project:
 - **GPIO**: 24 available pins (GPIO33-37 reserved for PSRAM)
 - **USB**: Native USB on GPIO19 (D-) and GPIO20 (D+)
 - **LED**: WS2812B RGB LED on GPIO21
+- **UART0**: Dedicated TX on GPIO43, RX on GPIO44 (accessible on edge connectors)
 - **Power**: 3.7V-6V, minimum 500mA @ 5V
 - **WiFi**: 2.4GHz 802.11 b/g/n
 - **Bluetooth**: BLE 5.0
+
+**Pin Assignments for TinkLink-USB:**
+- **GPIO21**: WS2812 RGB LED (status indicator)
+- **GPIO43**: UART0 TX (Extron switcher communication)
+- **GPIO44**: UART0 RX (Extron switcher communication)
+- **GPIO19/20**: USB OTG (RetroTINK communication - Phase 3)
 
 **USB Host Configuration:**
 
@@ -170,33 +180,174 @@ SVS NEW INPUT=2\r\n    # Switch to input 2 and load S2_*.rt4 profile
 
 ### Installation
 
-**Current Status - Phase 1 (CDC Mode Testing)**:
+**Current Status - Phase 2**: WiFi and LED functionality working, USB Host implementation in progress.
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/smudgeface/tink-link-usb.git
-   cd tink-link-usb
-   ```
+#### Step 1: Clone the Repository
 
-2. **Connect ESP32-S3-Zero** via USB-C cable
+```bash
+git clone https://github.com/smudgeface/tink-link-usb.git
+cd tink-link-usb
+```
 
-3. **Build and upload** (CDC mode - for initial testing):
-   ```bash
-   pio run -e esp32s3 -t upload
-   pio run -e esp32s3 -t uploadfs
-   pio device monitor
-   ```
+#### Step 2: Connect Hardware
 
-4. **Configure WiFi:**
-   - Device will start in AP mode if no credentials saved
-   - Connect to `TinkLink-XXXXXX` network
-   - Browse to `http://192.168.1.1`
-   - Configure your WiFi network
+Connect your **Waveshare ESP32-S3-Zero** to your computer via USB-C cable.
 
-5. **Access web interface:**
-   - After WiFi configured: `http://tinklink.local`
+#### Step 3: Build the Firmware
 
-**Note**: USB Host functionality (Phase 2) not yet implemented. See [implementation-plan.md](implementation-plan.md) for roadmap.
+Compile the project to verify everything is set up correctly:
+
+```bash
+pio run -e esp32s3
+```
+
+This compiles the firmware but does not upload it to the device.
+
+#### Step 4: Upload Firmware
+
+Flash the compiled firmware to the ESP32-S3:
+
+```bash
+pio run -e esp32s3 -t upload
+```
+
+The device will automatically reset after upload.
+
+#### Step 5: Upload Filesystem
+
+Upload the web interface files (HTML, CSS, config files) to the device's LittleFS filesystem:
+
+```bash
+pio run -e esp32s3 -t uploadfs
+```
+
+**Important**: You must run this command to access the web interface. Without it, you'll see "Not Found" errors when browsing to the device.
+
+#### Step 6: Monitor Serial Output (Optional)
+
+To view debug output and verify the device is working:
+
+```bash
+pio device monitor -e esp32s3
+```
+
+Press `Ctrl+C` to exit the monitor.
+
+#### Step 7: Configure WiFi
+
+On first boot, the device starts in Access Point (AP) mode:
+
+1. Look for the **blue blinking LED** on the ESP32-S3-Zero
+2. Connect to the WiFi network named **`TinkLink-XXXXXX`** (no password)
+3. Your device should auto-assign an IP via DHCP (192.168.1.100-200 range)
+4. Open a web browser and navigate to **`http://192.168.1.1`**
+5. Use the web interface to scan for networks and connect to your 2.4GHz WiFi
+
+#### Step 8: Access Web Interface
+
+After WiFi is configured:
+- The LED will turn **solid green** when connected
+- Access the device at **`http://tinklink.local`** (via mDNS)
+- Or use the IP address assigned by your router
+
+### Complete Build & Upload Commands
+
+For convenience, here's the complete sequence to build and flash everything:
+
+```bash
+# Build, upload firmware, and upload filesystem in one go
+pio run -e esp32s3 -t upload && pio run -e esp32s3 -t uploadfs
+```
+
+**Note**: USB Host functionality (Phase 3) not yet implemented. See [implementation-plan.md](implementation-plan.md) for roadmap.
+
+### OTA (Over-The-Air) Updates
+
+Once your device is connected to WiFi, you can update firmware and filesystem without USB:
+
+**Via Web Interface:**
+1. Navigate to `http://tinklink.local` → Debug page
+2. Scroll to "Firmware Update (OTA)" section
+3. Select firmware (`.bin`) or filesystem (`.bin`) file
+4. Click Upload and wait for completion
+5. Device will automatically reboot
+
+**Via Command Line (PlatformIO):**
+```bash
+# Build and upload firmware via OTA
+pio run -t ota -e esp32s3
+
+# Build and upload filesystem via OTA
+pio run -t otafs -e esp32s3
+
+# Use a specific IP address instead of mDNS
+TINKLINK_HOST=192.168.1.100 pio run -t ota -e esp32s3
+```
+
+**Via Python Script (standalone):**
+```bash
+python scripts/ota_upload.py firmware .pio/build/esp32s3/firmware.bin
+python scripts/ota_upload.py fs .pio/build/esp32s3/littlefs.bin
+python scripts/ota_upload.py firmware firmware.bin --host 192.168.1.100
+```
+
+**Environment Variables:**
+- `TINKLINK_HOST` - Device hostname/IP (default: `tinklink.local`)
+
+## Troubleshooting
+
+### Device Won't Boot / Boot Loop
+
+**Symptom**: Device continuously reboots with error: `E (xxx) spi_flash: Detected size(4096k) smaller than the size in the binary image header(8192k)`
+
+**Solution**: This occurs when the firmware is built for 8MB flash but your device has 4MB. The `platformio.ini` file must include:
+
+```ini
+board_upload.flash_size = 4MB
+board_build.flash_size = 4MB
+```
+
+These settings are already configured correctly in this project. If you still see this error:
+
+1. Clean the build cache: `pio run -e esp32s3 -t clean`
+2. Erase flash completely: `python3 ~/.platformio/packages/tool-esptoolpy/esptool.py --chip esp32s3 --port /dev/cu.usbmodem1101 erase_flash`
+3. Rebuild and upload: `pio run -e esp32s3 -t upload`
+
+### Web Interface Shows "Not Found"
+
+**Symptom**: Web server responds but all pages show "Not Found"
+
+**Solution**: The filesystem hasn't been uploaded. Run:
+
+```bash
+pio run -e esp32s3 -t uploadfs
+```
+
+This uploads the HTML, CSS, and config files to the device's LittleFS filesystem.
+
+### LED Color Reference
+
+- **Blue blinking** (500ms) = Access Point mode active
+- **Yellow solid** = Connecting to WiFi
+- **Green solid** = Connected to WiFi network
+- **Red solid** = Connection failed
+- **Off** = Disconnected or initializing
+
+### mDNS Not Working
+
+**Symptom**: Cannot access `http://tinklink.local`
+
+**Solution**:
+- **macOS/Linux**: mDNS should work automatically
+- **Windows**: Install [Bonjour Print Services](https://support.apple.com/kb/DL999) or use the device's IP address instead
+- **Alternative**: Check your router's DHCP client list for the device's IP address
+
+### Serial Monitor Not Working
+
+If `pio device monitor` fails with a termios error, the serial port may be in use. Try:
+- Unplug and replug the USB cable
+- Use a different serial terminal like `screen` or `minicom`
+- Check that no other application is using the serial port
 
 ## Project Structure
 
@@ -205,9 +356,14 @@ tink-link-usb/
 ├── .gitignore
 ├── LICENSE
 ├── README.md
+├── implementation-plan.md
 ├── platformio.ini
+├── scripts/
+│   └── ota_upload.py          # OTA upload automation script
 ├── src/
 │   ├── main.cpp
+│   ├── logger.h               # Centralized logging system
+│   ├── logger.cpp
 │   ├── usb_host_ftdi.h
 │   ├── usb_host_ftdi.cpp
 │   ├── extron_sw_vga.h
@@ -221,9 +377,9 @@ tink-link-usb/
 │   ├── config_manager.h
 │   └── config_manager.cpp
 └── data/
-    ├── index.html
-    ├── config.html
-    ├── debug.html
+    ├── index.html             # Status page
+    ├── config.html            # WiFi configuration
+    ├── debug.html             # System console & OTA updates
     ├── style.css
     └── config.json
 ```

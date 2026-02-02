@@ -88,10 +88,12 @@ private:
     int _retryCount;
     unsigned long _retryDelayMs;
     unsigned long _lastRetryTime;
+    unsigned long _lastDisconnectCheck;  // Track transient disconnects
 
     static const unsigned long CONNECT_TIMEOUT_MS = 15000;   // 15 seconds
     static const int MAX_RETRIES = 2;                        // 2 retries = 3 total attempts
     static const unsigned long BASE_RETRY_DELAY_MS = 5000;   // 5s, 10s delays
+    static const unsigned long DISCONNECT_TOLERANCE_MS = 3000; // 3s tolerance for transient disconnects
 
     APConfig _apConfig;
     StateChangeCallback _stateCallback;

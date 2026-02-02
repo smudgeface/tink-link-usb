@@ -26,6 +26,55 @@
 
 ## Current Status
 
+### ✅ Phase 2: WiFi, LED, Console, and OTA (COMPLETED)
+
+**Status**: All Phase 2 functionality working and tested
+
+**Completed Work**:
+- [x] WS2812 RGB LED status indication (FastLED library)
+- [x] LED colors: Blue blinking (AP), Yellow (connecting), Green (connected), Red (failed)
+- [x] WiFi AP mode with automatic fallback
+- [x] WiFi STA mode with credential persistence
+- [x] mDNS working (http://tinklink.local)
+- [x] All web pages functional (status, config, debug)
+- [x] Centralized logging system (Logger class)
+- [x] Web-based System Console with target selector (Extron/RetroTINK)
+- [x] UART TX/RX to Extron via GPIO43/44
+- [x] OTA firmware updates via web interface
+- [x] OTA filesystem updates via web interface
+- [x] PlatformIO OTA automation (`pio run -t ota`, `pio run -t otafs`)
+- [x] Standalone OTA upload script (`scripts/ota_upload.py`)
+
+**Key Files Added/Modified**:
+- `src/logger.h`, `src/logger.cpp` - Centralized logging with circular buffer
+- `src/web_server.cpp` - OTA upload handlers, logs API endpoint
+- `data/debug.html` - System Console UI, OTA upload UI
+- `scripts/ota_upload.py` - OTA automation for PlatformIO
+- `platformio.ini` - Added `extra_scripts` for OTA targets
+
+**Configuration**:
+```ini
+# platformio.ini - Phase 2
+ARDUINO_USB_MODE=1           # CDC mode (Serial debugging)
+ARDUINO_USB_CDC_ON_BOOT=1    # Enable USB CDC
+
+# OTA targets
+extra_scripts = scripts/ota_upload.py
+```
+
+**OTA Usage**:
+```bash
+# Via PlatformIO
+pio run -t ota -e esp32s3        # Upload firmware
+pio run -t otafs -e esp32s3      # Upload filesystem
+
+# Via Python script
+python scripts/ota_upload.py firmware .pio/build/esp32s3/firmware.bin
+python scripts/ota_upload.py fs .pio/build/esp32s3/littlefs.bin
+```
+
+---
+
 ### ✅ Phase 1: Base Framework (COMPLETED)
 
 **Status**: Project compiles and is ready for ESP32-S3 hardware testing
@@ -64,9 +113,11 @@ ARDUINO_USB_CDC_ON_BOOT=1    # Enable USB CDC
 
 ---
 
-## Phase 2: WiFi and LED Functionality Testing
+## ✅ Phase 2: WiFi and LED Functionality Testing (COMPLETED)
 
 **Goal**: Verify WiFi connectivity, AP fallback, and WS2812 LED status indication on ESP32-S3 hardware
+
+**Status**: All tests passed, plus additional features implemented (logging, console, OTA)
 
 ### 2.1: Hardware Setup
 
@@ -337,11 +388,14 @@ Phase 2 is complete when:
 - ✅ All API endpoints respond as expected
 - ✅ Serial output provides clear status messages
 - ✅ No crashes or hangs during WiFi state transitions
+- ✅ **BONUS**: Centralized logging system with web console
+- ✅ **BONUS**: OTA firmware and filesystem updates
+- ✅ **BONUS**: PlatformIO OTA automation scripts
 
-**Known Issues to Watch For**:
-- WS2812 timing sensitivity (may need to adjust FastLED settings)
-- mDNS may not work on all networks (routers blocking multicast)
-- 2.4GHz WiFi only (5GHz networks will not appear in scan)
+**Resolved Issues**:
+- LED color order corrected (RGB not GRB for ESP32-S3-Zero)
+- Flash size fixed (4MB not 8MB)
+- UART pins configured correctly (GPIO43/44)
 
 ---
 
@@ -747,33 +801,28 @@ void loop() {
 - Support for additional USB serial devices (CP210x, CH340)
 - Support for multiple RetroTINK units
 - Profile management via web interface
-- Remote firmware updates (OTA)
+- ✅ Remote firmware updates (OTA) - **COMPLETED**
 - Integration with home automation systems
 
 ---
 
 ## Next Steps
 
-**Immediate Actions** (Phase 2: WiFi Testing):
-1. Connect Waveshare ESP32-S3-Zero to computer via USB-C
-2. Add FastLED library dependency to platformio.ini
-3. Update main.cpp to use WS2812 LED control
-4. Build and upload firmware (CDC mode)
-5. Monitor serial output during boot
-6. Test all WiFi functionality:
-   - AP mode on first boot
-   - WiFi configuration via web interface
-   - Credential persistence
-   - AP fallback scenarios
-   - LED color indications
-7. Verify all web pages and API endpoints
-8. After Phase 2 complete, proceed to Phase 3: USB Host FTDI implementation
+**Immediate Actions** (Phase 3: USB Host):
+1. Create USB Host test fixture in `examples/usb_host_test/`
+2. Switch to USB OTG mode configuration
+3. Test basic USB Host functionality with RetroTINK 4K
+4. Implement `UsbHostFtdi` class
+5. Integrate with `RetroTink` class
+6. Test end-to-end: Extron input change → RetroTINK profile switch
 
 **Agent Handoff Notes**:
+- Phase 1 ✅ Complete - Base framework
+- Phase 2 ✅ Complete - WiFi, LED, Console, OTA
 - All code compiles successfully
-- Git history is clean with descriptive commits
-- README.md contains all reference links
-- Phase 1 complete - ready to begin Phase 2 WiFi testing
+- OTA updates working (web UI and command line)
 - User has Waveshare ESP32-S3-Zero hardware available
-- WS2812 LED on GPIO21 needs FastLED integration
-- After WiFi testing complete, proceed to Phase 3 USB Host implementation
+- UART communication with Extron verified on GPIO43/44
+- Ready to begin Phase 3: USB Host FTDI implementation
+- Key challenge: USB OTG mode will disable USB CDC debugging
+  - Solution: Use web console and OTA for debugging/updates

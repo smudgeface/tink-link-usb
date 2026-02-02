@@ -1,7 +1,7 @@
 {
     "extron": {
-        "txPin": 17,
-        "rxPin": 18
+        "txPin": 43,
+        "rxPin": 44
     },
     "hostname": "tinklink",
     "triggers": [

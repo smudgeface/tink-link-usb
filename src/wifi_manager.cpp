@@ -1,4 +1,5 @@
 #include "wifi_manager.h"
+#include "logger.h"
 
 WifiManager::WifiManager()
     : _state(State::DISCONNECTED)
@@ -8,6 +9,7 @@ WifiManager::WifiManager()
     , _retryCount(0)
     , _retryDelayMs(0)
     , _lastRetryTime(0)
+    , _lastDisconnectCheck(0)
     , _stateCallback(nullptr)
 {
     generateAPConfig();
@@ -21,8 +23,8 @@ bool WifiManager::begin(const String& hostname) {
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
 
-    Serial.printf("WifiManager: Initialized (hostname: %s)\n", _hostname.c_str());
-    Serial.printf("WifiManager: AP SSID will be '%s' if needed\n", _apConfig.ssid.c_str());
+    LOG_DEBUG("WifiManager: Initialized (hostname: %s)", _hostname.c_str());
+    LOG_DEBUG("WifiManager: AP SSID will be '%s' if needed", _apConfig.ssid.c_str());
     return true;
 }
 
@@ -33,7 +35,7 @@ void WifiManager::end() {
 
 bool WifiManager::connect(const String& ssid, const String& password) {
     if (ssid.length() == 0) {
-        Serial.println("WifiManager: Cannot connect - no SSID provided");
+        LOG_WARN("WifiManager: Cannot connect - no SSID provided");
         return false;
     }
 
@@ -45,7 +47,7 @@ bool WifiManager::connect(const String& ssid, const String& password) {
     _ssid = ssid;
     _password = password;
 
-    Serial.printf("WifiManager: Connecting to '%s'...\n", ssid.c_str());
+    LOG_INFO("WifiManager: Connecting to '%s'...", ssid.c_str());
 
     WiFi.disconnect(true);
     delay(100);
@@ -65,13 +67,13 @@ bool WifiManager::connect(const String& ssid, const String& password) {
 void WifiManager::disconnect() {
     // Don't allow disconnect in AP mode - doesn't make sense
     if (_mode == Mode::AP) {
-        Serial.println("WifiManager: Cannot disconnect in AP mode - use stopAccessPoint() instead");
+        LOG_WARN("WifiManager: Cannot disconnect in AP mode - use stopAccessPoint() instead");
         return;
     }
 
     WiFi.disconnect(true);
     setState(State::DISCONNECTED);
-    Serial.println("WifiManager: Disconnected");
+    LOG_INFO("WifiManager: Disconnected");
 }
 
 void WifiManager::update() {
@@ -84,20 +86,33 @@ void WifiManager::update() {
                 _retryCount = 0;  // Reset retry counter on success
                 _retryDelayMs = 0;
                 setupMDNS();
-                Serial.printf("WifiManager: Connected to '%s' - IP: %s\n",
-                              _ssid.c_str(), WiFi.localIP().toString().c_str());
+                LOG_INFO("WifiManager: Connected to '%s' - IP: %s",
+                         _ssid.c_str(), WiFi.localIP().toString().c_str());
             } else if (status == WL_CONNECT_FAILED ||
                        status == WL_NO_SSID_AVAIL ||
                        (millis() - _connectStartTime > CONNECT_TIMEOUT_MS)) {
                 setState(State::FAILED);
-                Serial.printf("WifiManager: Connection failed (status: %d)\n", status);
+                LOG_WARN("WifiManager: Connection failed (status: %d)", status);
             }
             break;
 
         case State::CONNECTED:
             if (status != WL_CONNECTED) {
-                setState(State::FAILED);  // Go to FAILED instead of DISCONNECTED to trigger retry
-                Serial.println("WifiManager: Connection lost");
+                // Use debouncing to avoid flapping on transient disconnects
+                if (_lastDisconnectCheck == 0) {
+                    // First time seeing disconnect - start timer
+                    _lastDisconnectCheck = millis();
+                    LOG_DEBUG("WifiManager: Disconnect detected (status: %d), waiting %lums to confirm",
+                              status, DISCONNECT_TOLERANCE_MS);
+                } else if (millis() - _lastDisconnectCheck >= DISCONNECT_TOLERANCE_MS) {
+                    // Disconnect persisted for tolerance period - actually disconnected
+                    setState(State::FAILED);  // Go to FAILED instead of DISCONNECTED to trigger retry
+                    LOG_WARN("WifiManager: Connection lost (confirmed)");
+                    _lastDisconnectCheck = 0;
+                }
+            } else {
+                // WiFi is connected - reset disconnect timer
+                _lastDisconnectCheck = 0;
             }
             break;
 
@@ -106,14 +121,24 @@ void WifiManager::update() {
             if (status == WL_CONNECTED) {
                 setState(State::CONNECTED);
                 setupMDNS();
-                Serial.printf("WifiManager: Reconnected - IP: %s\n",
-                              WiFi.localIP().toString().c_str());
+                LOG_INFO("WifiManager: Reconnected - IP: %s",
+                         WiFi.localIP().toString().c_str());
             }
             break;
 
         case State::FAILED:
-            // Handle retry logic with exponential backoff
-            handleRetryLogic();
+            // First check if we're actually connected (WiFi might have recovered)
+            if (status == WL_CONNECTED) {
+                setState(State::CONNECTED);
+                _retryCount = 0;  // Reset retry counter
+                _retryDelayMs = 0;
+                setupMDNS();
+                LOG_INFO("WifiManager: Connection recovered - IP: %s",
+                         WiFi.localIP().toString().c_str());
+            } else {
+                // Handle retry logic with exponential backoff
+                handleRetryLogic();
+            }
             break;
 
         case State::AP_ACTIVE:
@@ -126,7 +151,7 @@ bool WifiManager::startScan() {
     // Check if already scanning
     int16_t status = WiFi.scanComplete();
     if (status == WIFI_SCAN_RUNNING) {
-        Serial.println("WifiManager: Scan already in progress");
+        LOG_DEBUG("WifiManager: Scan already in progress");
         return false;
     }
 
@@ -135,7 +160,7 @@ bool WifiManager::startScan() {
         WiFi.scanDelete();
     }
 
-    Serial.println("WifiManager: Starting async network scan...");
+    LOG_DEBUG("WifiManager: Starting async network scan...");
     WiFi.scanNetworks(true, false);  // async=true, show_hidden=false
     return true;
 }
@@ -151,7 +176,7 @@ std::vector<WifiManager::NetworkInfo> WifiManager::getScanResults() {
     int n = WiFi.scanComplete();
 
     if (n >= 0) {
-        Serial.printf("WifiManager: Found %d networks\n", n);
+        LOG_DEBUG("WifiManager: Found %d networks", n);
         for (int i = 0; i < n; i++) {
             NetworkInfo info;
             info.ssid = WiFi.SSID(i);
@@ -161,10 +186,10 @@ std::vector<WifiManager::NetworkInfo> WifiManager::getScanResults() {
         }
         WiFi.scanDelete();
     } else if (n == WIFI_SCAN_FAILED) {
-        Serial.println("WifiManager: Scan failed");
+        LOG_WARN("WifiManager: Scan failed");
         WiFi.scanDelete();
     } else if (n == WIFI_SCAN_RUNNING) {
-        Serial.println("WifiManager: Scan still running");
+        LOG_DEBUG("WifiManager: Scan still running");
     }
 
     return networks;
@@ -211,9 +236,9 @@ void WifiManager::setState(State newState) {
 void WifiManager::setupMDNS() {
     if (MDNS.begin(_hostname.c_str())) {
         MDNS.addService("http", "tcp", 80);
-        Serial.printf("WifiManager: mDNS started - http://%s.local\n", _hostname.c_str());
+        LOG_INFO("WifiManager: mDNS started - http://%s.local", _hostname.c_str());
     } else {
-        Serial.println("WifiManager: mDNS setup failed");
+        LOG_ERROR("WifiManager: mDNS setup failed");
     }
 }
 
@@ -235,7 +260,7 @@ void WifiManager::generateAPConfig() {
 }
 
 bool WifiManager::startAccessPoint() {
-    Serial.println("WifiManager: Starting Access Point...");
+    LOG_INFO("WifiManager: Starting Access Point...");
 
     // Stop any existing connection
     WiFi.disconnect(true);
@@ -247,13 +272,13 @@ bool WifiManager::startAccessPoint() {
 
     // Set static IP configuration
     if (!WiFi.softAPConfig(_apConfig.ip, _apConfig.gateway, _apConfig.subnet)) {
-        Serial.println("WifiManager: Failed to configure AP IP");
+        LOG_ERROR("WifiManager: Failed to configure AP IP");
         return false;
     }
 
     // Start AP (open network)
     if (!WiFi.softAP(_apConfig.ssid.c_str(), _apConfig.password.c_str())) {
-        Serial.println("WifiManager: Failed to start AP");
+        LOG_ERROR("WifiManager: Failed to start AP");
         return false;
     }
 
@@ -264,23 +289,22 @@ bool WifiManager::startAccessPoint() {
 
     setState(State::AP_ACTIVE);
 
-    Serial.println("========================================");
-    Serial.println("  Access Point Active");
-    Serial.println("========================================");
-    Serial.printf("  SSID:     %s\n", _apConfig.ssid.c_str());
-    Serial.printf("  IP:       %s\n", _apConfig.ip.toString().c_str());
-    Serial.printf("  Security: Open (no password)\n");
-    Serial.println();
-    Serial.println("Connect to this network and browse to:");
-    Serial.printf("  http://%s\n", _apConfig.ip.toString().c_str());
-    Serial.println("========================================");
+    LOG_RAW("========================================\n");
+    LOG_RAW("  Access Point Active\n");
+    LOG_RAW("========================================\n");
+    LOG_INFO("  SSID:     %s", _apConfig.ssid.c_str());
+    LOG_INFO("  IP:       %s", _apConfig.ip.toString().c_str());
+    LOG_INFO("  Security: Open (no password)");
+    LOG_INFO("Connect to this network and browse to:");
+    LOG_INFO("  http://%s", _apConfig.ip.toString().c_str());
+    LOG_RAW("========================================\n");
 
     return true;
 }
 
 void WifiManager::stopAccessPoint() {
     if (_mode == Mode::AP) {
-        Serial.println("WifiManager: Stopping Access Point...");
+        LOG_INFO("WifiManager: Stopping Access Point...");
         WiFi.softAPdisconnect(true);
         WiFi.mode(WIFI_STA);
         _mode = Mode::STA;
@@ -305,7 +329,7 @@ void WifiManager::handleRetryLogic() {
 
     // Check if we've exceeded max retries
     if (_retryCount >= MAX_RETRIES) {
-        Serial.println("WifiManager: Max retries exceeded - falling back to AP mode");
+        LOG_WARN("WifiManager: Max retries exceeded - falling back to AP mode");
         _retryCount = 0;  // Reset for next time
         startAccessPoint();
         return;
@@ -318,12 +342,12 @@ void WifiManager::handleRetryLogic() {
         _retryDelayMs = getRetryDelay(_retryCount);
         _lastRetryTime = currentTime;
         _retryCount++;
-        Serial.printf("WifiManager: Will retry in %lu seconds (attempt %d/%d)\n",
-                      _retryDelayMs / 1000, _retryCount, MAX_RETRIES);
+        LOG_INFO("WifiManager: Will retry in %lu seconds (attempt %d/%d)",
+                 _retryDelayMs / 1000, _retryCount, MAX_RETRIES);
     } else if (currentTime - _lastRetryTime >= _retryDelayMs) {
         // Time to retry
-        Serial.printf("WifiManager: Retrying connection (attempt %d/%d)...\n",
-                      _retryCount, MAX_RETRIES);
+        LOG_INFO("WifiManager: Retrying connection (attempt %d/%d)...",
+                 _retryCount, MAX_RETRIES);
         _retryDelayMs = 0;  // Reset delay
         connect(_ssid, _password);  // Retry connection
     }

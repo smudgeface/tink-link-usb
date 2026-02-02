@@ -1,12 +1,18 @@
 #include <Arduino.h>
+#include <FastLED.h>
 #include "config_manager.h"
 #include "extron_sw_vga.h"
 #include "retrotink.h"
 #include "wifi_manager.h"
 #include "web_server.h"
+#include "logger.h"
 
 // WS2812 RGB LED on GPIO21 (Waveshare ESP32-S3-Zero)
 #define RGB_LED_PIN 21
+#define NUM_LEDS 1
+
+// FastLED array
+CRGB leds[NUM_LEDS];
 
 // Global instances
 ConfigManager configManager;
@@ -15,26 +21,93 @@ RetroTink* tink = nullptr;
 WifiManager wifiManager;
 WebServer webServer;
 
+// LED manual control
+bool ledManualMode = false;
+unsigned long ledManualModeStart = 0;
+const unsigned long LED_MANUAL_TIMEOUT = 10000;  // 10 seconds
+
+// LED control callback for web interface
+void setLEDColor(int r, int g, int b) {
+    if (r == -1 && g == -1 && b == -1) {
+        // Reset to WiFi mode
+        ledManualMode = false;
+        LOG_DEBUG("LED: Manual mode disabled - returning to WiFi state indication");
+
+        // Immediately update LED to current WiFi state
+        WifiManager::State currentState = wifiManager.getState();
+        if (currentState == WifiManager::State::CONNECTED) {
+            leds[0] = CRGB::Green;
+        } else if (currentState == WifiManager::State::CONNECTING) {
+            leds[0] = CRGB::Yellow;
+        } else if (currentState == WifiManager::State::FAILED) {
+            leds[0] = CRGB::Red;
+        } else if (currentState == WifiManager::State::AP_ACTIVE) {
+            leds[0] = CRGB::Blue;
+        } else {
+            leds[0] = CRGB::Black;
+        }
+        FastLED.show();
+    } else {
+        // Set manual color
+        ledManualMode = true;
+        ledManualModeStart = millis();
+        leds[0] = CRGB(r, g, b);
+        FastLED.show();
+        LOG_DEBUG("LED: Manual mode enabled - RGB(%d,%d,%d)", r, g, b);
+    }
+}
+
 void setup() {
     // Initialize serial for debug output
     Serial.begin(115200);
     delay(1000);  // Give USB CDC time to connect
 
-    // Initialize RGB LED (turn it off initially)
-    pinMode(RGB_LED_PIN, OUTPUT);
-    digitalWrite(RGB_LED_PIN, LOW);
+    // Initialize logger
+    Logger::instance().begin();
 
-    Serial.println();
-    Serial.println("========================================");
-    Serial.println("  TinkLink-USB v1.0.0");
-    Serial.println("  ESP32-S3 RetroTINK 4K Controller");
-    Serial.println("========================================");
-    Serial.println();
+    // Initialize WS2812 RGB LED
+    // Note: This board uses RGB color order, not the more common GRB
+    FastLED.addLeds<WS2812, RGB_LED_PIN, RGB>(leds, NUM_LEDS);
+    FastLED.setBrightness(50);  // 0-255, moderate brightness
+    leds[0] = CRGB::Black;
+    FastLED.show();
+
+    LOG_RAW("\n");
+    LOG_RAW("========================================\n");
+    LOG_RAW("  TinkLink-USB v1.0.0\n");
+    LOG_RAW("  ESP32-S3 RetroTINK 4K Controller\n");
+    LOG_RAW("========================================\n");
+    LOG_RAW("\n");
+
+    // LED Test Sequence - cycle through colors to verify LED works
+    LOG_DEBUG("LED Test: Red...");
+    leds[0] = CRGB::Red;
+    FastLED.show();
+    delay(500);
+
+    LOG_DEBUG("LED Test: Green...");
+    leds[0] = CRGB::Green;
+    FastLED.show();
+    delay(500);
+
+    LOG_DEBUG("LED Test: Blue...");
+    leds[0] = CRGB::Blue;
+    FastLED.show();
+    delay(500);
+
+    LOG_DEBUG("LED Test: Yellow...");
+    leds[0] = CRGB::Yellow;
+    FastLED.show();
+    delay(500);
+
+    LOG_DEBUG("LED Test: Off");
+    leds[0] = CRGB::Black;
+    FastLED.show();
 
     // Initialize configuration manager (LittleFS)
-    Serial.println("[1/5] Initializing configuration...");
+    LOG_INFO("[1/5] Initializing configuration...");
     if (!configManager.begin()) {
-        Serial.println("ERROR: Failed to initialize configuration manager!");
+        LOG_ERROR("Failed to initialize configuration manager!");
     }
 
     // Get pin configurations
@@ -42,7 +115,7 @@ void setup() {
     auto wifiConfig = configManager.getWifiConfig();
 
     // Initialize RetroTINK controller (stub mode for now)
-    Serial.println("[2/5] Initializing RetroTINK controller...");
+    LOG_INFO("[2/5] Initializing RetroTINK controller...");
     tink = new RetroTink();
     tink->begin();
 
@@ -52,78 +125,74 @@ void setup() {
     }
 
     // Initialize Extron switcher
-    Serial.println("[3/5] Initializing Extron SW VGA...");
+    LOG_INFO("[3/5] Initializing Extron SW VGA...");
     extron = new ExtronSwVga(extronConfig.txPin, extronConfig.rxPin, 9600);
     if (!extron->begin()) {
-        Serial.println("ERROR: Failed to initialize Extron handler!");
+        LOG_ERROR("Failed to initialize Extron handler!");
     }
 
     // Connect Extron input changes to RetroTINK
     extron->onInputChange([](int input) {
-        Serial.printf("Input change detected: %d\n", input);
+        LOG_INFO("Input change detected: %d", input);
         tink->onExtronInputChange(input);
     });
 
     // Initialize WiFi manager
-    Serial.println("[4/5] Initializing WiFi...");
+    LOG_INFO("[4/5] Initializing WiFi...");
     wifiManager.begin(wifiConfig.hostname);
 
     // Set up WiFi state change callback
     wifiManager.onStateChange([](WifiManager::State state) {
         switch (state) {
             case WifiManager::State::CONNECTED:
-                Serial.println("WiFi: Connected!");
+                LOG_INFO("WiFi: Connected!");
                 break;
             case WifiManager::State::DISCONNECTED:
-                Serial.println("WiFi: Disconnected");
+                LOG_INFO("WiFi: Disconnected");
                 break;
             case WifiManager::State::CONNECTING:
-                Serial.println("WiFi: Connecting...");
+                LOG_INFO("WiFi: Connecting...");
                 break;
             case WifiManager::State::FAILED:
-                Serial.println("WiFi: Connection failed");
+                LOG_WARN("WiFi: Connection failed");
                 break;
             case WifiManager::State::AP_ACTIVE:
-                Serial.println("WiFi: Access Point active");
+                LOG_INFO("WiFi: Access Point active");
                 break;
         }
     });
 
     // Auto-connect if credentials are saved, otherwise start AP mode
     if (configManager.hasWifiCredentials()) {
-        Serial.printf("Attempting to connect to saved network: %s\n",
-                      wifiConfig.ssid.c_str());
+        LOG_INFO("Attempting to connect to saved network: %s", wifiConfig.ssid.c_str());
         wifiManager.connect(wifiConfig.ssid, wifiConfig.password);
     } else {
-        Serial.println("No WiFi credentials saved - starting Access Point mode");
-        Serial.println("Connect to the AP and configure WiFi via web interface");
+        LOG_INFO("No WiFi credentials saved - starting Access Point mode");
+        LOG_INFO("Connect to the AP and configure WiFi via web interface");
         wifiManager.startAccessPoint();
     }
 
     // Initialize web server
-    Serial.println("[5/5] Starting web server...");
+    LOG_INFO("[5/5] Starting web server...");
     webServer.begin(&wifiManager, &configManager, extron, tink);
+    webServer.setLEDCallback(setLEDColor);
 
-    Serial.println();
-    Serial.println("========================================");
-    Serial.println("  Initialization complete!");
-    Serial.println("========================================");
-    Serial.println();
-    Serial.println("Pin assignments:");
-    Serial.printf("  Extron TX:    GPIO%d\n", extronConfig.txPin);
-    Serial.printf("  Extron RX:    GPIO%d\n", extronConfig.rxPin);
-    Serial.printf("  RGB LED:      GPIO%d\n", RGB_LED_PIN);
-    Serial.println();
-    Serial.println("USB Mode: CDC (Serial debugging enabled)");
-    Serial.println("Note: USB Host for RetroTINK not yet implemented");
-    Serial.println("      RetroTINK commands will be logged only");
-    Serial.println();
+    LOG_RAW("\n");
+    LOG_RAW("========================================\n");
+    LOG_RAW("  Initialization complete!\n");
+    LOG_RAW("========================================\n");
+    LOG_RAW("\n");
+    LOG_INFO("Pin assignments:");
+    LOG_INFO("  Extron TX:    GPIO%d", extronConfig.txPin);
+    LOG_INFO("  Extron RX:    GPIO%d", extronConfig.rxPin);
+    LOG_INFO("  RGB LED:      GPIO%d", RGB_LED_PIN);
+    LOG_INFO("USB Mode: CDC (Serial debugging enabled)");
+    LOG_INFO("Note: USB Host for RetroTINK not yet implemented");
     if (wifiManager.isAPActive()) {
-        Serial.printf("Web interface: http://%s\n", wifiManager.getIP().c_str());
+        LOG_INFO("Web interface: http://%s", wifiManager.getIP().c_str());
     } else {
-        Serial.println("Web interface: http://tinklink.local");
+        LOG_INFO("Web interface: http://tinklink.local");
     }
-    Serial.println();
 }
 
 void loop() {
@@ -133,26 +202,74 @@ void loop() {
     // Process incoming Extron messages
     extron->update();
 
-    // Simple RGB LED control using digitalWrite
-    // For now, just use it as a simple indicator (blue LED function)
-    // TODO: Could use FastLED or Adafruit_NeoPixel for full RGB control
-    static unsigned long lastBlink = 0;
-    static bool ledOn = false;
+    // Check for manual LED mode timeout
     unsigned long now = millis();
+    if (ledManualMode && (now - ledManualModeStart >= LED_MANUAL_TIMEOUT)) {
+        ledManualMode = false;
+        LOG_DEBUG("LED: Manual mode timeout - returning to WiFi state indication");
 
-    if (wifiManager.getState() == WifiManager::State::AP_ACTIVE) {
-        // Blink in AP mode (500ms interval)
+        // Force LED update to current WiFi state
+        WifiManager::State currentState = wifiManager.getState();
+        if (currentState == WifiManager::State::CONNECTED) {
+            leds[0] = CRGB::Green;
+            FastLED.show();
+        } else if (currentState == WifiManager::State::CONNECTING) {
+            leds[0] = CRGB::Yellow;
+            FastLED.show();
+        } else if (currentState == WifiManager::State::FAILED) {
+            leds[0] = CRGB::Red;
+            FastLED.show();
+        } else if (currentState == WifiManager::State::AP_ACTIVE) {
+            leds[0] = CRGB::Blue;  // Will start blinking on next loop iteration
+            FastLED.show();
+        } else {
+            leds[0] = CRGB::Black;
+            FastLED.show();
+        }
+    }
+
+    // WS2812 RGB LED status indication (skip if in manual mode)
+    if (!ledManualMode) {
+        static unsigned long lastBlink = 0;
+        static bool ledOn = false;
+        static WifiManager::State lastState = WifiManager::State::DISCONNECTED;
+        WifiManager::State currentState = wifiManager.getState();
+
+    // Only update LED when state changes or for blinking states
+    if (currentState == WifiManager::State::AP_ACTIVE) {
+        // Blink blue in AP mode (500ms interval)
         if (now - lastBlink >= 500) {
             lastBlink = now;
             ledOn = !ledOn;
-            digitalWrite(RGB_LED_PIN, ledOn ? HIGH : LOW);
+            leds[0] = ledOn ? CRGB::Blue : CRGB::Black;
+            FastLED.show();
         }
-    } else if (wifiManager.getState() == WifiManager::State::CONNECTED) {
-        // Solid on when connected
-        digitalWrite(RGB_LED_PIN, HIGH);
+    } else if (currentState == WifiManager::State::CONNECTING) {
+        // Solid yellow when connecting
+        if (lastState != currentState) {
+            leds[0] = CRGB::Yellow;
+            FastLED.show();
+        }
+    } else if (currentState == WifiManager::State::CONNECTED) {
+        // Solid green when connected
+        if (lastState != currentState) {
+            leds[0] = CRGB::Green;
+            FastLED.show();
+        }
+    } else if (currentState == WifiManager::State::FAILED) {
+        // Solid red when failed
+        if (lastState != currentState) {
+            leds[0] = CRGB::Red;
+            FastLED.show();
+        }
     } else {
-        // Off for other states
-        digitalWrite(RGB_LED_PIN, LOW);
+        // Off for disconnected/other states
+        if (lastState != currentState) {
+            leds[0] = CRGB::Black;
+            FastLED.show();
+        }
+        }
+        lastState = currentState;
     }
 
     // Small delay to prevent tight loop

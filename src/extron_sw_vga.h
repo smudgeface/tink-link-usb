@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <functional>
+#include <vector>
 
 // Extron SW VGA switcher handler
 // Monitors serial output for input change messages
@@ -30,6 +31,10 @@ public:
     // Send command to switcher
     void sendCommand(const char* cmd);
 
+    // Get recent received messages (for debugging)
+    std::vector<String> getRecentMessages(int count = 10);
+    void clearRecentMessages();
+
 private:
     uint8_t _txPin;
     uint8_t _rxPin;
@@ -39,6 +44,10 @@ private:
     int _currentInput;
 
     InputChangeCallback _inputCallback;
+
+    // Store recent messages for debugging (circular buffer)
+    static const int MAX_RECENT_MESSAGES = 50;
+    std::vector<String> _recentMessages;
 
     void processLine(const String& line);
     bool isInputMessage(const String& line);

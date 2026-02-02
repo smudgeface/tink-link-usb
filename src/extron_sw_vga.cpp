@@ -1,4 +1,5 @@
 #include "extron_sw_vga.h"
+#include "logger.h"
 #include <HardwareSerial.h>
 
 // Use UART1 for Extron communication
@@ -21,8 +22,8 @@ bool ExtronSwVga::begin() {
     // Configure UART1 with specified pins
     ExtronSerial.begin(_baud, SERIAL_8N1, _rxPin, _txPin);
 
-    Serial.printf("Extron SW VGA initialized on TX:GPIO%d, RX:GPIO%d at %lu baud\n",
-                  _txPin, _rxPin, _baud);
+    LOG_INFO("Extron SW VGA initialized on TX:GPIO%d, RX:GPIO%d at %lu baud",
+             _txPin, _rxPin, _baud);
     return true;
 }
 
@@ -55,13 +56,19 @@ void ExtronSwVga::update() {
 }
 
 void ExtronSwVga::processLine(const String& line) {
-    Serial.printf("Extron RX: [%s]\n", line.c_str());
+    LOG_DEBUG("Extron RX: [%s]", line.c_str());
+
+    // Store in recent messages buffer
+    _recentMessages.push_back(line);
+    if (_recentMessages.size() > MAX_RECENT_MESSAGES) {
+        _recentMessages.erase(_recentMessages.begin());
+    }
 
     if (isInputMessage(line)) {
         int input = parseInputNumber(line);
         if (input > 0) {
             _currentInput = input;
-            Serial.printf("Extron input changed to: %d\n", input);
+            LOG_INFO("Extron input changed to: %d", input);
 
             if (_inputCallback) {
                 _inputCallback(input);
@@ -96,8 +103,23 @@ void ExtronSwVga::onInputChange(InputChangeCallback callback) {
 
 void ExtronSwVga::sendCommand(const char* cmd) {
     if (cmd) {
-        Serial.printf("Extron TX: [%s]\n", cmd);
+        LOG_DEBUG("Extron TX: [%s]", cmd);
         ExtronSerial.print(cmd);
         ExtronSerial.print("\r\n");
     }
+}
+
+std::vector<String> ExtronSwVga::getRecentMessages(int count) {
+    std::vector<String> result;
+    int start = _recentMessages.size() > count ? _recentMessages.size() - count : 0;
+
+    for (int i = start; i < _recentMessages.size(); i++) {
+        result.push_back(_recentMessages[i]);
+    }
+
+    return result;
+}
+
+void ExtronSwVga::clearRecentMessages() {
+    _recentMessages.clear();
 }

@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Debug - TinkLink-Lite</title>
+    <title>Debug - TinkLink-USB</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>TinkLink-Lite</h1>
+        <h1>TinkLink-USB</h1>
 
         <nav>
             <a href="/">Status</a>
@@ -19,95 +19,163 @@
         <div id="message"></div>
 
         <div class="card">
-            <h2>RetroTINK Command Tester</h2>
-            <p>Send raw commands to RetroTINK via RMT UART (GPIO1)</p>
-            <p><strong>Note:</strong> Commands are automatically terminated with CRLF (\r\n)</p>
+            <h2>System Console</h2>
+            <p style="margin-bottom: 10px; font-size: 0.9em; color: #888;">
+                Shows system logs and UART messages. UART: GPIO43 (TX) / GPIO44 (RX) @ 9600 baud.
+            </p>
 
-            <form id="command-form" onsubmit="return sendCommand(event)">
-                <div class="input-group">
-                    <label for="command">Command</label>
-                    <input type="text" id="command" name="command" placeholder="e.g., SVS NEW INPUT=1" required autofocus>
-                </div>
+            <!-- Console Output -->
+            <div style="background: #1e1e1e; border-radius: 4px 4px 0 0; padding: 10px;">
+                <div id="console-output" style="font-family: 'Courier New', monospace; font-size: 13px; color: #d4d4d4; height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;"><span style="color: #569cd6;">TinkLink-USB Serial Console</span>
+<span style="color: #6a9955;">Ready. Type below and press Enter to send.</span>
 
-                <div class="btn-row">
-                    <button type="submit">Send Command</button>
+</div>
+            </div>
+
+            <!-- Console Input -->
+            <form id="console-form" onsubmit="return sendConsoleCommand(event)" style="margin: 0;">
+                <div style="display: flex; background: #2d2d30; border-radius: 0 0 4px 4px; overflow: hidden; align-items: center;">
+                    <select id="console-target" style="background: #3e3e42; color: #d4d4d4; border: none; padding: 8px 4px 8px 8px; font-size: 0.8em; outline: none; cursor: pointer; width: 70px;">
+                        <option value="extron">Extron</option>
+                        <option value="tink" disabled>Tink</option>
+                    </select>
+                    <span style="color: #569cd6; font-family: 'Courier New', monospace; font-weight: bold; padding: 10px 8px 10px 8px;">&gt;</span>
+                    <input type="text" id="console-input" placeholder="Enter command..."
+                           style="flex: 1; font-family: 'Courier New', monospace; background: transparent; color: #d4d4d4; border: none; padding: 10px 8px; font-size: 14px; outline: none;"
+                           autocomplete="off" autofocus>
+                    <button type="submit" style="padding: 10px 16px; border-radius: 0; font-size: 0.9em;">Send</button>
                 </div>
             </form>
 
-            <div style="margin-top: 20px;">
-                <h3>Quick Test Commands</h3>
-                <div class="btn-row" style="flex-wrap: wrap; gap: 8px;">
-                    <button class="secondary" onclick="quickCommand('SVS NEW INPUT=1')">SVS Profile 1</button>
-                    <button class="secondary" onclick="quickCommand('SVS NEW INPUT=2')">SVS Profile 2</button>
-                    <button class="secondary" onclick="quickCommand('SVS NEW INPUT=3')">SVS Profile 3</button>
-                    <button class="secondary" onclick="quickCommand('remote prof1')">Remote Prof 1</button>
-                    <button class="secondary" onclick="quickCommand('remote prof2')">Remote Prof 2</button>
-                    <button class="secondary" onclick="quickCommand('TEST')">Test Signal</button>
-                    <button onclick="sendContinuousTest()" style="background: #d4af37; font-weight: bold;">🔁 Continuous Test (10x)</button>
+            <!-- Console Toolbar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid #333;">
+                <div style="display: flex; gap: 16px; align-items: center;">
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85em; color: #888; cursor: pointer;">
+                        <input type="checkbox" id="auto-scroll-checkbox" checked onchange="toggleAutoScroll()">
+                        <span>Auto-scroll</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85em; color: #888; cursor: pointer;">
+                        <input type="checkbox" id="auto-refresh-checkbox" onchange="toggleConsoleAutoRefresh()">
+                        <span>Live updates</span>
+                    </label>
                 </div>
-                <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                    <strong>Tip:</strong> Use "Continuous Test" for oscilloscope triggering - sends 10 signals with 100ms gaps
-                </p>
+                <button type="button" class="secondary" onclick="clearConsole()" style="padding: 6px 12px; font-size: 0.8em;">Clear</button>
+            </div>
+
+            <!-- Quick Commands -->
+            <div style="margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap;">
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <span style="font-size: 0.75em; color: #666;">Extron:</span>
+                    <button class="secondary" onclick="quickConsoleCommand('TEST', 'extron')" style="font-size: 0.8em; padding: 4px 10px;">TEST</button>
+                    <button class="secondary" onclick="quickConsoleCommand('HELLO', 'extron')" style="font-size: 0.8em; padding: 4px 10px;">HELLO</button>
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <span style="font-size: 0.75em; color: #666;">RetroTINK:</span>
+                    <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=1', 'tink')" style="font-size: 0.8em; padding: 4px 10px;" disabled>Profile 1</button>
+                    <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=2', 'tink')" style="font-size: 0.8em; padding: 4px 10px;" disabled>Profile 2</button>
+                </div>
             </div>
         </div>
 
         <div class="card">
-            <h2>Extron Input Simulator</h2>
-            <p>Simulate Extron input change to test trigger system</p>
-
-            <form id="simulate-form" onsubmit="return simulateInput(event)">
-                <div class="input-group">
-                    <label for="input-number">Input Number (1-16)</label>
-                    <input type="number" id="input-number" name="input" min="1" max="16" value="1" required>
-                </div>
-
-                <div class="btn-row">
-                    <button type="submit">Simulate Input Change</button>
-                </div>
-            </form>
+            <h2>LED Color Tester</h2>
+            <p>Test WS2812 RGB LED colors (GPIO21)</p>
+            <p><strong>Note:</strong> LED will return to WiFi state indication mode after 10 seconds</p>
 
             <div style="margin-top: 20px;">
-                <h3>Quick Input Select</h3>
+                <h3>Color Test Buttons</h3>
                 <div class="btn-row" style="flex-wrap: wrap; gap: 8px;">
-                    <button class="secondary" onclick="quickInput(1)">Input 1</button>
-                    <button class="secondary" onclick="quickInput(2)">Input 2</button>
-                    <button class="secondary" onclick="quickInput(3)">Input 3</button>
-                    <button class="secondary" onclick="quickInput(4)">Input 4</button>
-                    <button class="secondary" onclick="quickInput(5)">Input 5</button>
-                    <button class="secondary" onclick="quickInput(6)">Input 6</button>
+                    <button onclick="setLEDColor('red')" style="background: #dc3545;">🔴 Red</button>
+                    <button onclick="setLEDColor('green')" style="background: #28a745;">🟢 Green</button>
+                    <button onclick="setLEDColor('blue')" style="background: #007bff;">🔵 Blue</button>
+                    <button onclick="setLEDColor('yellow')" style="background: #ffc107; color: #000;">🟡 Yellow</button>
+                    <button onclick="setLEDColor('cyan')" style="background: #17a2b8;">🟦 Cyan</button>
+                    <button onclick="setLEDColor('magenta')" style="background: #e83e8c;">🟣 Magenta</button>
+                    <button onclick="setLEDColor('white')" style="background: #f8f9fa; color: #000;">⚪ White</button>
+                    <button onclick="setLEDColor('off')" style="background: #343a40;">⚫ Off</button>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <h3>Custom RGB Values</h3>
+                    <form id="led-form" onsubmit="return setCustomLED(event)">
+                        <div style="display: flex; gap: 10px; align-items: end;">
+                            <div class="input-group" style="flex: 1;">
+                                <label for="led-r">Red (0-255)</label>
+                                <input type="number" id="led-r" min="0" max="255" value="255">
+                            </div>
+                            <div class="input-group" style="flex: 1;">
+                                <label for="led-g">Green (0-255)</label>
+                                <input type="number" id="led-g" min="0" max="255" value="0">
+                            </div>
+                            <div class="input-group" style="flex: 1;">
+                                <label for="led-b">Blue (0-255)</label>
+                                <input type="number" id="led-b" min="0" max="255" value="0">
+                            </div>
+                            <button type="submit" style="margin-bottom: 10px;">Set Color</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div style="margin-top: 15px;">
+                    <button onclick="resetLED()" class="secondary">↩️ Return to WiFi Mode</button>
                 </div>
             </div>
         </div>
 
         <div class="card">
-            <h2>Test Signal Info</h2>
-            <p><strong>Oscilloscope Setup:</strong></p>
+            <h2>Firmware Update (OTA)</h2>
+            <p style="font-size: 0.9em; color: #888; margin-bottom: 15px;">
+                Update firmware or filesystem over WiFi. Device will reboot after successful update.
+            </p>
+
+            <div style="margin-bottom: 20px;">
+                <h3 style="font-size: 1em; margin-bottom: 10px;">Firmware (.bin)</h3>
+                <form id="ota-firmware-form" onsubmit="return uploadOTA(event, 'firmware')">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="file" id="firmware-file" accept=".bin" style="flex: 1;">
+                        <button type="submit" id="firmware-upload-btn">Upload Firmware</button>
+                    </div>
+                </form>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <h3 style="font-size: 1em; margin-bottom: 10px;">Filesystem (.bin)</h3>
+                <form id="ota-fs-form" onsubmit="return uploadOTA(event, 'fs')">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="file" id="fs-file" accept=".bin" style="flex: 1;">
+                        <button type="submit" id="fs-upload-btn">Upload Filesystem</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="ota-progress" style="display: none;">
+                <div style="background: #333; border-radius: 4px; height: 20px; overflow: hidden; margin-bottom: 10px;">
+                    <div id="ota-progress-bar" style="background: #00d4ff; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                </div>
+                <p id="ota-status" style="font-size: 0.9em; color: #888;"></p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Implementation Status</h2>
+            <p><strong>Current Phase: WiFi & LED Testing (Phase 2)</strong></p>
+
+            <p><strong>Hardware Configuration:</strong></p>
             <ul>
-                <li>Connect probe to GPIO1</li>
-                <li>Trigger: Falling edge, 3.3V threshold</li>
-                <li>Timebase: 200µs/div (for full frame)</li>
-                <li>Voltage: 1V/div, DC coupled</li>
+                <li><strong>Extron Input:</strong> UART0 on TX:GPIO43, RX:GPIO44 @ 9600 baud</li>
+                <li><strong>RetroTINK Output:</strong> USB Host (not yet implemented)</li>
+                <li><strong>Status LED:</strong> WS2812 RGB on GPIO21</li>
             </ul>
 
-            <p><strong>Expected Timing @ 9600 baud:</strong></p>
+            <p><strong>Implementation Phases:</strong></p>
             <ul>
-                <li>Bit period: 104.17µs (~104 RMT ticks @ 1MHz)</li>
-                <li>Idle state: HIGH (3.3V)</li>
-                <li>Start bit: LOW (0V) for 104µs</li>
-                <li>Data bits: LSB first, 8 bits</li>
-                <li>Stop bit: HIGH for 104µs</li>
+                <li>✅ Phase 1: Base framework & CDC mode</li>
+                <li>✅ Phase 2: WiFi & LED functionality</li>
+                <li>⏳ Phase 3: USB Host implementation for RetroTINK communication</li>
             </ul>
 
-            <p><strong>"TEST" command breakdown:</strong></p>
-            <ul>
-                <li>T (0x54): 0b01010100</li>
-                <li>E (0x45): 0b01000101</li>
-                <li>S (0x53): 0b01010011</li>
-                <li>T (0x54): 0b01010100</li>
-                <li>\r (0x0D): 0b00001101</li>
-                <li>\n (0x0A): 0b00001010</li>
-                <li>Total frame: ~6.25ms</li>
-            </ul>
+            <p><strong>Note:</strong> Commands sent via this page are currently logged to serial only.
+            USB Host communication will be implemented in Phase 3.</p>
         </div>
     </div>
 
@@ -118,90 +186,363 @@
             setTimeout(() => msg.innerHTML = '', 5000);
         }
 
-        function sendCommand(event) {
-            event.preventDefault();
-
-            const command = document.getElementById('command').value;
-
-            fetch('/api/debug/send', {
+        function setLEDColor(color) {
+            fetch('/api/debug/led', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'command=' + encodeURIComponent(command)
+                body: 'color=' + color
             })
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
                     showMessage('Error: ' + data.error, 'error');
                 } else {
-                    showMessage('Command sent: ' + data.command, 'success');
-                    console.log('Command sent:', data.command);
+                    showMessage('LED set to ' + color.toUpperCase() + ' (R:' + data.r + ' G:' + data.g + ' B:' + data.b + ')', 'success');
                 }
             })
             .catch(err => {
-                showMessage('Failed to send command', 'error');
-                console.error('Send failed:', err);
+                showMessage('Failed to set LED color', 'error');
+                console.error('LED set failed:', err);
+            });
+        }
+
+        function setCustomLED(event) {
+            event.preventDefault();
+
+            const r = document.getElementById('led-r').value;
+            const g = document.getElementById('led-g').value;
+            const b = document.getElementById('led-b').value;
+
+            fetch('/api/debug/led', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'r=' + r + '&g=' + g + '&b=' + b
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage('Error: ' + data.error, 'error');
+                } else {
+                    showMessage('LED set to RGB(' + data.r + ',' + data.g + ',' + data.b + ')', 'success');
+                }
+            })
+            .catch(err => {
+                showMessage('Failed to set LED color', 'error');
+                console.error('LED set failed:', err);
             });
 
             return false;
         }
 
-        function quickCommand(cmd) {
-            document.getElementById('command').value = cmd;
-            sendCommand(new Event('submit'));
-        }
-
-        function simulateInput(event) {
-            event.preventDefault();
-
-            const input = document.getElementById('input-number').value;
-
-            fetch('/api/debug/simulate', {
+        function resetLED() {
+            fetch('/api/debug/led', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'input=' + input
+                body: 'reset=1'
             })
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
                     showMessage('Error: ' + data.error, 'error');
                 } else {
-                    showMessage('Simulated input ' + data.input + ' → ' + data.result, 'success');
-                    console.log('Simulation result:', data);
+                    showMessage('LED returned to WiFi mode', 'success');
                 }
             })
             .catch(err => {
-                showMessage('Failed to simulate input', 'error');
-                console.error('Simulate failed:', err);
+                showMessage('Failed to reset LED', 'error');
+                console.error('LED reset failed:', err);
             });
+        }
+
+        // Serial Console functions
+        let consoleAutoRefreshInterval = null;
+        let consoleAutoScroll = true;
+        let lastUartCount = 0;
+        let lastLogCount = 0;
+
+        function appendToConsole(text, type) {
+            const consoleOutput = document.getElementById('console-output');
+            const line = document.createElement('span');
+            line.style.display = 'block';
+
+            if (type === 'tx-extron') {
+                line.innerHTML = '<span style="color: #569cd6;">[extron] &gt; ' + escapeHtml(text) + '</span>';
+            } else if (type === 'tx-tink') {
+                line.innerHTML = '<span style="color: #c586c0;">[tink] &gt; ' + escapeHtml(text) + '</span>';
+            } else if (type === 'tx') {
+                line.innerHTML = '<span style="color: #569cd6;">&gt; ' + escapeHtml(text) + '</span>';
+            } else if (type === 'rx-extron') {
+                line.innerHTML = '<span style="color: #4ec9b0;">[extron] &lt; ' + escapeHtml(text) + '</span>';
+            } else if (type === 'rx-tink') {
+                line.innerHTML = '<span style="color: #ce9178;">[tink] &lt; ' + escapeHtml(text) + '</span>';
+            } else if (type === 'rx') {
+                line.innerHTML = '<span style="color: #4ec9b0;">&lt; ' + escapeHtml(text) + '</span>';
+            } else if (type === 'log-debug') {
+                line.innerHTML = '<span style="color: #808080;">[D] ' + escapeHtml(text) + '</span>';
+            } else if (type === 'log-info') {
+                line.innerHTML = '<span style="color: #9cdcfe;">[I] ' + escapeHtml(text) + '</span>';
+            } else if (type === 'log-warn') {
+                line.innerHTML = '<span style="color: #dcdcaa;">[W] ' + escapeHtml(text) + '</span>';
+            } else if (type === 'log-error') {
+                line.innerHTML = '<span style="color: #f14c4c;">[E] ' + escapeHtml(text) + '</span>';
+            } else if (type === 'system') {
+                line.innerHTML = '<span style="color: #6a9955;">' + escapeHtml(text) + '</span>';
+            } else {
+                line.textContent = text;
+            }
+
+            consoleOutput.appendChild(line);
+
+            // Auto-scroll if enabled
+            if (consoleAutoScroll) {
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            }
+        }
+
+        function getLogType(level) {
+            switch (level) {
+                case 0: return 'log-debug';
+                case 1: return 'log-info';
+                case 2: return 'log-warn';
+                case 3: return 'log-error';
+                default: return 'log-info';
+            }
+        }
+
+        function sendConsoleCommand(event, targetOverride) {
+            event.preventDefault();
+
+            const input = document.getElementById('console-input');
+            const command = input.value.trim();
+            const target = targetOverride || document.getElementById('console-target').value;
+
+            if (!command) {
+                return false;
+            }
+
+            // Display command in console with target prefix
+            appendToConsole(command, 'tx-' + target);
+
+            // Route to appropriate API
+            let apiUrl = '/api/uart/send';
+            let bodyParam = 'message';
+
+            if (target === 'tink') {
+                apiUrl = '/api/debug/send';  // Uses RetroTINK stub for now
+                bodyParam = 'command';
+            }
+
+            fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: bodyParam + '=' + encodeURIComponent(command)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    appendToConsole('Error: ' + data.error, 'system');
+                }
+                // Poll for response after short delay
+                setTimeout(refreshConsoleMessages, 100);
+            })
+            .catch(err => {
+                appendToConsole('Failed to send command', 'system');
+                console.error('Console send failed:', err);
+            });
+
+            // Clear input
+            input.value = '';
 
             return false;
         }
 
-        function quickInput(num) {
-            document.getElementById('input-number').value = num;
-            simulateInput(new Event('submit'));
+        function quickConsoleCommand(cmd, target) {
+            document.getElementById('console-input').value = cmd;
+            if (target) {
+                document.getElementById('console-target').value = target;
+            }
+            sendConsoleCommand(new Event('submit'), target);
         }
 
-        function sendContinuousTest() {
-            fetch('/api/debug/continuous', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'count=10'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showMessage('Error: ' + data.error, 'error');
-                } else {
-                    showMessage('Sent ' + data.count + ' test signals (check oscilloscope)', 'success');
-                    console.log('Continuous test sent:', data.count, 'signals');
+        function refreshConsoleMessages() {
+            // Fetch both UART messages and system logs
+            Promise.all([
+                fetch('/api/uart/receive?count=50').then(r => r.json()),
+                fetch('/api/logs?since=' + lastLogCount + '&count=50').then(r => r.json())
+            ])
+            .then(([uartData, logData]) => {
+                // Append new UART messages (from Extron)
+                if (uartData.count > lastUartCount) {
+                    const newMessages = uartData.messages.slice(lastUartCount);
+                    newMessages.forEach(msg => {
+                        appendToConsole(msg, 'rx-extron');
+                    });
+                    lastUartCount = uartData.count;
+                }
+
+                // Append new system logs
+                if (logData.logs && logData.logs.length > 0) {
+                    logData.logs.forEach(log => {
+                        appendToConsole(log.msg, getLogType(log.lvl));
+                    });
+                    lastLogCount = logData.total;
                 }
             })
             .catch(err => {
-                showMessage('Failed to send continuous test', 'error');
-                console.error('Continuous test failed:', err);
+                console.error('Failed to refresh console messages:', err);
             });
         }
+
+        function clearConsole() {
+            const consoleOutput = document.getElementById('console-output');
+            consoleOutput.innerHTML = '<span style="color: #569cd6;">TinkLink-USB Serial Console</span>\n<span style="color: #6a9955;">Ready. Type commands below and press Enter to send.</span>\n\n';
+
+            // Clear server-side messages and logs
+            Promise.all([
+                fetch('/api/uart/receive?clear=1'),
+                fetch('/api/logs?clear=1')
+            ])
+            .then(() => {
+                lastUartCount = 0;
+                lastLogCount = 0;
+            })
+            .catch(err => {
+                console.error('Failed to clear messages:', err);
+            });
+        }
+
+        function toggleAutoScroll() {
+            consoleAutoScroll = document.getElementById('auto-scroll-checkbox').checked;
+        }
+
+        function toggleConsoleAutoRefresh() {
+            const checkbox = document.getElementById('auto-refresh-checkbox');
+
+            if (checkbox.checked) {
+                consoleAutoRefreshInterval = setInterval(refreshConsoleMessages, 1000);
+                refreshConsoleMessages(); // Immediate refresh
+            } else {
+                if (consoleAutoRefreshInterval) {
+                    clearInterval(consoleAutoRefreshInterval);
+                    consoleAutoRefreshInterval = null;
+                }
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // OTA Upload functions
+        function uploadOTA(event, mode) {
+            event.preventDefault();
+
+            const fileInput = document.getElementById(mode === 'firmware' ? 'firmware-file' : 'fs-file');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                showMessage('Please select a file', 'error');
+                return false;
+            }
+
+            // Confirm before upload
+            const typeLabel = mode === 'firmware' ? 'firmware' : 'filesystem';
+            if (!confirm(`Upload ${typeLabel} update?\n\nFile: ${file.name}\nSize: ${(file.size / 1024).toFixed(1)} KB\n\nDevice will reboot after successful update.`)) {
+                return false;
+            }
+
+            // Show progress UI
+            const progressDiv = document.getElementById('ota-progress');
+            const progressBar = document.getElementById('ota-progress-bar');
+            const statusText = document.getElementById('ota-status');
+            progressDiv.style.display = 'block';
+            progressBar.style.width = '0%';
+            statusText.textContent = 'Starting upload...';
+
+            // Disable buttons during upload
+            document.getElementById('firmware-upload-btn').disabled = true;
+            document.getElementById('fs-upload-btn').disabled = true;
+
+            // Create form data
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('mode', mode);
+
+            // Upload with progress tracking
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/ota/upload', true);
+
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    progressBar.style.width = percent + '%';
+                    statusText.textContent = `Uploading: ${percent}% (${(e.loaded / 1024).toFixed(0)} / ${(e.total / 1024).toFixed(0)} KB)`;
+                }
+            };
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    progressBar.style.width = '100%';
+                    progressBar.style.background = '#28a745';
+                    statusText.textContent = 'Update successful! Device is rebooting...';
+                    showMessage('Update successful! Reconnect in a few seconds.', 'success');
+
+                    // Wait and reload page
+                    setTimeout(() => {
+                        statusText.textContent = 'Reconnecting...';
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 5000);
+                    }, 2000);
+                } else {
+                    let errorMsg = 'Update failed';
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.error) errorMsg = response.error;
+                    } catch (e) {}
+                    progressBar.style.background = '#dc3545';
+                    statusText.textContent = 'Error: ' + errorMsg;
+                    showMessage('Update failed: ' + errorMsg, 'error');
+                    resetOtaUI();
+                }
+            };
+
+            xhr.onerror = function() {
+                progressBar.style.background = '#dc3545';
+                statusText.textContent = 'Upload failed - connection error';
+                showMessage('Upload failed - connection error', 'error');
+                resetOtaUI();
+            };
+
+            xhr.send(formData);
+            return false;
+        }
+
+        function resetOtaUI() {
+            document.getElementById('firmware-upload-btn').disabled = false;
+            document.getElementById('fs-upload-btn').disabled = false;
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            document.getElementById('console-input').focus();
+            // Load recent logs to show startup messages
+            fetch('/api/logs?count=50')
+            .then(r => r.json())
+            .then(data => {
+                if (data.logs && data.logs.length > 0) {
+                    data.logs.forEach(log => {
+                        appendToConsole(log.msg, getLogType(log.lvl));
+                    });
+                    lastLogCount = data.total;
+                }
+            })
+            .catch(err => {
+                console.error('Failed to load initial logs:', err);
+            });
+        });
     </script>
 </body>
 </html>
