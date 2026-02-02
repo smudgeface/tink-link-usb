@@ -31,26 +31,28 @@ def get_host():
     """Get device hostname from environment or default."""
     return os.environ.get('TINKLINK_HOST', 'tinklink.local')
 
-def check_connectivity(host):
+def check_connectivity(host, timeout=3):
     """Check if device is reachable."""
     url = f"http://{host}/api/status"
     try:
         req = urllib.request.Request(url, method='GET')
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             return response.status == 200
     except Exception:
         return False
 
-def fetch_logs(host, since=0, count=50):
+def fetch_logs(host, since=0, count=50, timeout=5):
     """Fetch logs from device API."""
     url = f"http://{host}/api/logs?since={since}&count={count}"
     try:
         req = urllib.request.Request(url, method='GET')
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             return json.loads(response.read().decode('utf-8'))
     except urllib.error.URLError as e:
         return None
     except json.JSONDecodeError:
+        return None
+    except Exception:
         return None
 
 def clear_logs(host):
@@ -90,26 +92,53 @@ def print_logs(logs):
 def tail_logs(host, interval=1.0):
     """Continuously tail logs from device."""
     last_total = 0
+    connected = True
+    disconnect_time = None
 
     print(f"Tailing logs from {host} (Ctrl+C to stop)...")
     print("-" * 60)
 
     try:
         while True:
-            data = fetch_logs(host, since=last_total, count=100)
+            data = fetch_logs(host, since=last_total, count=100, timeout=3)
 
             if data is None:
-                print(f"\033[31m[Connection lost - retrying...]\033[0m")
-                time.sleep(interval * 2)
+                if connected:
+                    # Just lost connection
+                    connected = False
+                    disconnect_time = time.time()
+                    print(f"\033[31m[Connection lost - waiting for device...]\033[0m")
+                elif time.time() - disconnect_time > 10:
+                    # Periodic reminder every 10 seconds
+                    print(f"\033[31m[Still waiting for device...]\033[0m")
+                    disconnect_time = time.time()
+                time.sleep(interval)
                 continue
 
-            logs = data.get('logs', [])
             total = data.get('total', 0)
+            logs = data.get('logs', [])
+
+            # Detect device reboot: total count reset or went backwards
+            if total < last_total:
+                if not connected:
+                    print(f"\033[32m[Device reconnected - reboot detected]\033[0m")
+                else:
+                    print(f"\033[33m[Device rebooted - log count reset]\033[0m")
+                # Fetch recent logs from the beginning
+                last_total = 0
+                data = fetch_logs(host, since=0, count=100, timeout=3)
+                if data:
+                    logs = data.get('logs', [])
+                    total = data.get('total', 0)
+
+            if not connected:
+                print(f"\033[32m[Device reconnected]\033[0m")
+                connected = True
 
             if logs:
                 print_logs(logs)
-                last_total = total
 
+            last_total = total
             time.sleep(interval)
 
     except KeyboardInterrupt:
