@@ -213,7 +213,13 @@ pio run -e esp32s3 -t upload
 
 The device will automatically reset after upload.
 
-**Note**: In Phase 3 (USB Host mode), CDC will be disabled and USB uploads will require holding the **BOOT button** during upload, or using OTA updates instead.
+**Note**: In Phase 3 (USB Host mode), CDC will be disabled and USB uploads will require manually entering bootloader mode, or using OTA updates instead. To enter bootloader mode:
+1. Hold the **BOOT** button
+2. Press and release **RESET** (or unplug/replug USB)
+3. Release **BOOT** - device is now waiting for upload
+4. Run `pio run -t upload` within a few seconds
+
+OTA updates are recommended once the device has WiFi configured, as they don't require physical button access.
 
 #### Step 5: Upload Filesystem
 
