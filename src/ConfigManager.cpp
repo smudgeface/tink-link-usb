@@ -3,11 +3,15 @@
 #include <LittleFS.h>
 
 ConfigManager::ConfigManager() {
-    // Default pin assignments for ESP32-S3-Zero
+    // Default pin assignments for ESP32-S3-Zero (Waveshare)
     // Switcher uses UART0 on GPIO43 (TX) / GPIO44 (RX)
     _switcherConfig.type = "Extron SW VGA";
     _switcherConfig.txPin = 43;
     _switcherConfig.rxPin = 44;
+
+    // Hardware pins
+    _hardwareConfig.ledPin = 21;  // WS2812 RGB LED
+
     _wifiConfig.hostname = "tinklink";
 }
 
@@ -47,6 +51,11 @@ bool ConfigManager::loadConfig() {
         _switcherConfig.type = doc["switcher"]["type"] | "Extron SW VGA";
         _switcherConfig.txPin = doc["switcher"]["txPin"] | 43;
         _switcherConfig.rxPin = doc["switcher"]["rxPin"] | 44;
+    }
+
+    // Parse hardware config
+    if (doc["hardware"].is<JsonObject>()) {
+        _hardwareConfig.ledPin = doc["hardware"]["ledPin"] | 21;
     }
 
     // Parse hostname (from root or wirelessClient for backwards compatibility)
@@ -96,6 +105,9 @@ bool ConfigManager::saveConfig() {
     doc["switcher"]["type"] = _switcherConfig.type;
     doc["switcher"]["txPin"] = _switcherConfig.txPin;
     doc["switcher"]["rxPin"] = _switcherConfig.rxPin;
+
+    // Hardware config
+    doc["hardware"]["ledPin"] = _hardwareConfig.ledPin;
 
     // Hostname
     doc["hostname"] = _wifiConfig.hostname;

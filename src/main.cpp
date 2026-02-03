@@ -8,12 +8,14 @@
 #include "Logger.h"
 #include "version.h"
 
-// WS2812 RGB LED on GPIO21 (Waveshare ESP32-S3-Zero)
-#define RGB_LED_PIN 21
+// WS2812 RGB LED configuration (loaded from config.json)
 #define NUM_LEDS 1
 
 // FastLED array
 CRGB leds[NUM_LEDS];
+
+// LED pin (set during setup from config)
+uint8_t ledPin = 21;  // Default for Waveshare ESP32-S3-Zero
 
 // Global instances
 ConfigManager configManager;
@@ -77,19 +79,46 @@ void setup() {
     // Initialize logger
     Logger::instance().begin();
 
-    // Initialize WS2812 RGB LED
-    // Note: This board uses RGB color order, not the more common GRB
-    FastLED.addLeds<WS2812, RGB_LED_PIN, RGB>(leds, NUM_LEDS);
-    FastLED.setBrightness(50);  // 0-255, moderate brightness
-    leds[0] = CRGB::Black;
-    FastLED.show();
-
     LOG_RAW("\n");
     LOG_RAW("========================================\n");
     LOG_INFO("  TinkLink-USB v%s", TINKLINK_VERSION_STRING);
     LOG_RAW("  ESP32-S3 RetroTINK 4K Controller\n");
     LOG_RAW("========================================\n");
     LOG_RAW("\n");
+
+    // Initialize configuration manager (LittleFS) - load before hardware init
+    LOG_INFO("[1/5] Initializing configuration...");
+    if (!configManager.begin()) {
+        LOG_ERROR("Failed to initialize configuration manager!");
+    }
+
+    // Get pin configurations
+    auto switcherConfig = configManager.getSwitcherConfig();
+    auto hardwareConfig = configManager.getHardwareConfig();
+    auto wifiConfig = configManager.getWifiConfig();
+
+    // Store LED pin from config
+    ledPin = hardwareConfig.ledPin;
+
+    // Initialize WS2812 RGB LED using configured pin
+    // Note: This board uses RGB color order, not the more common GRB
+    // FastLED requires compile-time pin for template, so we use switch/case
+    switch (ledPin) {
+        case 21:
+            FastLED.addLeds<WS2812, 21, RGB>(leds, NUM_LEDS);
+            break;
+        case 48:
+            FastLED.addLeds<WS2812, 48, RGB>(leds, NUM_LEDS);
+            break;
+        default:
+            LOG_WARN("LED pin %d not supported by FastLED template. Using GPIO21.", ledPin);
+            FastLED.addLeds<WS2812, 21, RGB>(leds, NUM_LEDS);
+            ledPin = 21;
+            break;
+    }
+    FastLED.setBrightness(50);  // 0-255, moderate brightness
+    leds[0] = CRGB::Black;
+    FastLED.show();
 
     // LED Test Sequence - cycle through colors to verify LED works
     LOG_DEBUG("LED Test: Red...");
@@ -115,16 +144,6 @@ void setup() {
     LOG_DEBUG("LED Test: Off");
     leds[0] = CRGB::Black;
     FastLED.show();
-
-    // Initialize configuration manager (LittleFS)
-    LOG_INFO("[1/5] Initializing configuration...");
-    if (!configManager.begin()) {
-        LOG_ERROR("Failed to initialize configuration manager!");
-    }
-
-    // Get pin configurations
-    auto switcherConfig = configManager.getSwitcherConfig();
-    auto wifiConfig = configManager.getWifiConfig();
 
     // Initialize RetroTINK controller (stub mode for now)
     LOG_INFO("[2/5] Initializing RetroTINK controller...");
@@ -197,7 +216,7 @@ void setup() {
     LOG_INFO("Pin assignments:");
     LOG_INFO("  Switcher TX:  GPIO%d", switcherConfig.txPin);
     LOG_INFO("  Switcher RX:  GPIO%d", switcherConfig.rxPin);
-    LOG_INFO("  RGB LED:      GPIO%d", RGB_LED_PIN);
+    LOG_INFO("  RGB LED:      GPIO%d", ledPin);
     LOG_INFO("USB Mode: CDC (Serial debugging enabled)");
     LOG_INFO("Note: USB Host for RetroTINK not yet implemented");
     if (wifiManager.isAPActive()) {

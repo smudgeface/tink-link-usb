@@ -4,6 +4,9 @@
         "txPin": 43,
         "rxPin": 44
     },
+    "hardware": {
+        "ledPin": 21
+    },
     "hostname": "tinklink",
     "triggers": [
         {

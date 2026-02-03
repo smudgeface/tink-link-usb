@@ -43,6 +43,13 @@ public:
         uint8_t rxPin;  ///< UART RX pin (default: GPIO44)
     };
 
+    /**
+     * Hardware pin configuration.
+     */
+    struct HardwareConfig {
+        uint8_t ledPin;  ///< WS2812 RGB LED pin (default: GPIO21)
+    };
+
     ConfigManager();
 
     /**
@@ -82,6 +89,9 @@ public:
     /** @return Current switcher pin configuration */
     const SwitcherConfig& getSwitcherConfig() const { return _switcherConfig; }
 
+    /** @return Current hardware pin configuration */
+    const HardwareConfig& getHardwareConfig() const { return _hardwareConfig; }
+
     /** @return List of configured switcher input to RetroTINK profile triggers */
     const std::vector<TriggerMapping>& getTriggers() const { return _triggers; }
 
@@ -113,6 +123,7 @@ public:
 private:
     WifiConfig _wifiConfig;
     SwitcherConfig _switcherConfig;
+    HardwareConfig _hardwareConfig;
     std::vector<TriggerMapping> _triggers;
 
     bool loadDefaultConfig();
