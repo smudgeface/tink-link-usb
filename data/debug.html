@@ -49,17 +49,7 @@
             </form>
 
             <!-- Console Toolbar -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid #333;">
-                <div style="display: flex; gap: 16px; align-items: center;">
-                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85em; color: #888; cursor: pointer;">
-                        <input type="checkbox" id="auto-scroll-checkbox" checked onchange="toggleAutoScroll()">
-                        <span>Auto-scroll</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85em; color: #888; cursor: pointer;">
-                        <input type="checkbox" id="auto-refresh-checkbox" onchange="toggleConsoleAutoRefresh()">
-                        <span>Live updates</span>
-                    </label>
-                </div>
+            <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid #333;">
                 <button type="button" class="secondary" onclick="clearConsole()" style="padding: 6px 12px; font-size: 0.8em;">Clear</button>
             </div>
 
@@ -427,24 +417,6 @@
             });
         }
 
-        function toggleAutoScroll() {
-            consoleAutoScroll = document.getElementById('auto-scroll-checkbox').checked;
-        }
-
-        function toggleConsoleAutoRefresh() {
-            const checkbox = document.getElementById('auto-refresh-checkbox');
-
-            if (checkbox.checked) {
-                consoleAutoRefreshInterval = setInterval(refreshConsoleMessages, 1000);
-                refreshConsoleMessages(); // Immediate refresh
-            } else {
-                if (consoleAutoRefreshInterval) {
-                    clearInterval(consoleAutoRefreshInterval);
-                    consoleAutoRefreshInterval = null;
-                }
-            }
-        }
-
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
@@ -566,6 +538,9 @@
             .catch(err => {
                 console.error('Failed to load initial logs:', err);
             });
+
+            // Start live updates automatically
+            consoleAutoRefreshInterval = setInterval(refreshConsoleMessages, 1000);
         });
     </script>
 </body>
