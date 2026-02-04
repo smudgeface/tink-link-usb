@@ -8,6 +8,8 @@ A USB-based ESP32-S3 bridge between video switchers and the RetroTINK 4K.
 
 TinkLink-USB automatically triggers RetroTINK 4K profile changes when your video switcher changes inputs. This version uses **USB Host** to communicate directly with the RetroTINK 4K over its USB serial interface, eliminating the need for VGA cable serial connections and level shifters.
 
+<img src="assets/hardware/IMG_6513.jpeg" width="500" alt="Completed tinklink USB device">
+
 ## Why USB Instead of UART?
 
 The original [TinkLink-Lite](https://github.com/smudgeface/tink-link-lite) project used the RetroTINK's HD-15 (VGA) serial pins, which required:
