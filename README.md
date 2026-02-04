@@ -449,26 +449,36 @@ tink-link-usb/
 ├── .gitignore
 ├── LICENSE
 ├── README.md
+├── CLAUDE.md                  # AI assistant development guide
 ├── implementation-plan.md
 ├── platformio.ini
+├── assets/
+│   └── hardware/              # Hardware documentation and images
+│       ├── esp32-s3-zero.jpg          # ESP32-S3-Zero product photo
+│       ├── ESP32-S3-Zero-2D-size.jpg  # Board dimensions (2D drawing)
+│       ├── ESP32-S3-Zero-Sch.pdf      # Circuit schematic
+│       ├── ESP32-S3-Zero.stp          # 3D STEP CAD model
+│       ├── max3232-module.jpg         # MAX3232 RS232 converter
+│       ├── db9-to-3.5mm-adapter.jpg   # DB9 serial adapter
+│       └── IMG_6513.jpeg              # Completed device photo
 ├── scripts/
 │   ├── ota_upload.py          # OTA firmware/filesystem upload
 │   └── logs.py                # Remote log monitoring
 ├── src/
 │   ├── main.cpp               # Application entry point
 │   ├── version.h              # Semantic version defines
-│   ├── logger.h               # Centralized logging system
-│   ├── logger.cpp
-│   ├── extron_sw_vga.h        # Extron switcher UART handler
-│   ├── extron_sw_vga.cpp
-│   ├── retrotink.h            # RetroTINK 4K controller (stub)
-│   ├── retrotink.cpp
-│   ├── wifi_manager.h         # WiFi STA/AP management
-│   ├── wifi_manager.cpp
-│   ├── web_server.h           # Async web server and API
-│   ├── web_server.cpp
-│   ├── config_manager.h       # LittleFS configuration
-│   └── config_manager.cpp
+│   ├── Logger.h               # Centralized logging system
+│   ├── Logger.cpp
+│   ├── ExtronSwVga.h          # Extron switcher UART handler
+│   ├── ExtronSwVga.cpp
+│   ├── RetroTink.h            # RetroTINK 4K controller (stub)
+│   ├── RetroTink.cpp
+│   ├── WifiManager.h          # WiFi STA/AP management
+│   ├── WifiManager.cpp
+│   ├── WebServer.h            # Async web server and API
+│   ├── WebServer.cpp
+│   ├── ConfigManager.h        # LittleFS configuration
+│   └── ConfigManager.cpp
 └── data/
     ├── index.html             # Status page
     ├── config.html            # WiFi and trigger configuration

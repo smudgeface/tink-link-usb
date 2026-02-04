@@ -114,12 +114,13 @@ ARDUINO_USB_CDC_ON_BOOT=1    # Enable USB CDC
 
 **Files**:
 - `src/main.cpp` - Application entry point
-- `src/retrotink.{h,cpp}` - Stub implementation (to be completed in Phase 2)
-- `src/config_manager.{h,cpp}` - Configuration management
-- `src/wifi_manager.{h,cpp}` - WiFi connectivity
-- `src/web_server.{h,cpp}` - Web interface
-- `src/extron_sw_vga.{h,cpp}` - Extron RS-232 handler
+- `src/RetroTink.{h,cpp}` - Stub implementation (to be completed in Phase 2)
+- `src/ConfigManager.{h,cpp}` - Configuration management
+- `src/WifiManager.{h,cpp}` - WiFi connectivity
+- `src/WebServer.{h,cpp}` - Web interface
+- `src/ExtronSwVga.{h,cpp}` - Extron RS-232 handler
 - `data/` - Web interface files (HTML/CSS)
+- `assets/hardware/` - Hardware documentation and product images
 
 ---
 
@@ -453,8 +454,8 @@ Phase 2 is complete when:
 **Objective**: Create reusable USB Host FTDI serial class
 
 **Files to Create**:
-- `src/usb_host_ftdi.h` - USB Host FTDI interface
-- `src/usb_host_ftdi.cpp` - Implementation based on EspUsbHost
+- `src/UsbHostFtdi.h` - USB Host FTDI interface
+- `src/UsbHostFtdi.cpp` - Implementation based on EspUsbHost
 
 **Class Interface**:
 ```cpp
@@ -502,7 +503,7 @@ private:
 
 **Objective**: Replace stub implementation with USB Host serial
 
-**Modifications to `src/retrotink.cpp`**:
+**Modifications to `src/RetroTink.cpp`**:
 ```cpp
 // Replace:
 Serial.printf("RetroTINK TX (stub): [%s]\n", command.c_str());
