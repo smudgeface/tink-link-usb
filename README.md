@@ -178,15 +178,21 @@ SVS NEW INPUT=2\r\n    # Switch to input 2 and load S2_*.rt4 profile
 
    <img src="assets/hardware/esp32-s3-zero.jpg" width="400" alt="Waveshare ESP32-S3-Zero">
 
-3. **RS-232 to TTL Adapter** - For Extron switcher connection
-   - [DB9 RS232 to TTL Module (MAX3232)](https://www.aliexpress.com/item/1005009105067080.html)
-   - Converts Extron's RS-232 levels to ESP32 3.3V UART
+3. **RS-232 to TTL Module** - For Extron switcher connection
+   - [MAX3232 TTL to RS232 Converter Module](https://www.aliexpress.com/item/1005006210630153.html)
+   - Converts between RS-232 voltage levels and ESP32 3.3V UART
 
-   <img src="assets/hardware/rs232-ttl-module.jpg" width="400" alt="DB9 RS232 to TTL Module">
+   <img src="assets/hardware/max3232-module.jpg" width="400" alt="MAX3232 TTL to RS232 Module">
 
-4. **USB OTG Cable** - For connecting ESP32-S3 to RetroTINK 4K (Phase 3)
+4. **DB9 Serial Adapter** - For connecting to Extron serial port
+   - [DB9 to 3.5mm Stereo Adapter](https://www.aliexpress.com/item/1005009105067080.html)
+   - Connects TinkLink USB to Extron's DB9 serial port
 
-5. **2.4GHz WiFi network** - For web interface access
+   <img src="assets/hardware/db9-to-3.5mm-adapter.jpg" width="400" alt="DB9 to 3.5mm Stereo Adapter">
+
+5. **USB OTG Cable** - For connecting ESP32-S3 to RetroTINK 4K (Phase 3)
+
+6. **2.4GHz WiFi network** - For web interface access
 
 ### Installation
 
