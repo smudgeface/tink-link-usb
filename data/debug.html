@@ -36,8 +36,8 @@
             <!-- Console Input -->
             <form id="console-form" onsubmit="return sendConsoleCommand(event)" style="margin: 0;">
                 <div style="display: flex; background: #2d2d30; border-radius: 0 0 4px 4px; overflow: hidden; align-items: center;">
-                    <select id="console-target" style="background: #3e3e42; color: #d4d4d4; border: none; padding: 8px 4px 8px 8px; font-size: 0.8em; outline: none; cursor: pointer; width: 70px;">
-                        <option value="extron">Extron</option>
+                    <select id="console-target" style="background: #3e3e42; color: #d4d4d4; border: none; padding: 8px 4px 8px 8px; font-size: 0.8em; outline: none; cursor: pointer; width: 80px;">
+                        <option value="extron">Switcher</option>
                         <option value="tink" disabled>Tink</option>
                     </select>
                     <span style="color: #569cd6; font-family: 'Courier New', monospace; font-weight: bold; padding: 10px 8px 10px 8px;">&gt;</span>
@@ -48,23 +48,21 @@
                 </div>
             </form>
 
-            <!-- Console Toolbar -->
-            <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid #333;">
-                <button type="button" class="secondary" onclick="clearConsole()" style="padding: 6px 12px; font-size: 0.8em;">Clear</button>
-            </div>
-
             <!-- Quick Commands -->
-            <div style="margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap;">
-                <div style="display: flex; gap: 6px; align-items: center;">
-                    <span style="font-size: 0.75em; color: #666;">Extron:</span>
-                    <button class="secondary" onclick="quickConsoleCommand('TEST', 'extron')" style="font-size: 0.8em; padding: 4px 10px;">TEST</button>
-                    <button class="secondary" onclick="quickConsoleCommand('HELLO', 'extron')" style="font-size: 0.8em; padding: 4px 10px;">HELLO</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid #333; gap: 16px; flex-wrap: wrap;">
+                <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <span style="font-size: 0.75em; color: #666;">Switcher:</span>
+                        <button class="secondary" onclick="quickConsoleCommand('TEST', 'extron')" style="font-size: 0.8em; padding: 4px 10px;">TEST</button>
+                        <button class="secondary" onclick="quickConsoleCommand('HELLO', 'extron')" style="font-size: 0.8em; padding: 4px 10px;">HELLO</button>
+                    </div>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <span style="font-size: 0.75em; color: #666;">RetroTINK:</span>
+                        <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=1', 'tink')" style="font-size: 0.8em; padding: 4px 10px;" disabled>Profile 1</button>
+                        <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=2', 'tink')" style="font-size: 0.8em; padding: 4px 10px;" disabled>Profile 2</button>
+                    </div>
                 </div>
-                <div style="display: flex; gap: 6px; align-items: center;">
-                    <span style="font-size: 0.75em; color: #666;">RetroTINK:</span>
-                    <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=1', 'tink')" style="font-size: 0.8em; padding: 4px 10px;" disabled>Profile 1</button>
-                    <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=2', 'tink')" style="font-size: 0.8em; padding: 4px 10px;" disabled>Profile 2</button>
-                </div>
+                <button type="button" class="secondary" onclick="clearConsole()" style="padding: 6px 12px; font-size: 0.8em;">Clear</button>
             </div>
         </div>
 
@@ -272,13 +270,13 @@
                 '<span style="color: #666;">' + formatTimestamp(timestamp) + '</span> ' : '';
 
             if (type === 'tx-extron') {
-                line.innerHTML = '<span style="color: #569cd6;">[extron] &gt; ' + escapeHtml(text) + '</span>';
+                line.innerHTML = '<span style="color: #569cd6;">[switcher] &gt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'tx-tink') {
                 line.innerHTML = '<span style="color: #c586c0;">[tink] &gt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'tx') {
                 line.innerHTML = '<span style="color: #569cd6;">&gt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'rx-extron') {
-                line.innerHTML = tsPrefix + '<span style="color: #4ec9b0;">[extron] &lt; ' + escapeHtml(text) + '</span>';
+                line.innerHTML = tsPrefix + '<span style="color: #4ec9b0;">[switcher] &lt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'rx-tink') {
                 line.innerHTML = tsPrefix + '<span style="color: #ce9178;">[tink] &lt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'rx') {
