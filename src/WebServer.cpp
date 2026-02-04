@@ -65,6 +65,10 @@ void WebServer::setupRoutes() {
     _server->on("/api/wifi/save", HTTP_POST,
         [this](AsyncWebServerRequest* request) { handleApiSave(request); });
 
+    // Configuration endpoints
+    _server->on("/api/config/triggers", HTTP_POST,
+        [this](AsyncWebServerRequest* request) { handleApiConfigTriggers(request); });
+
     // RetroTINK endpoints
     _server->on("/api/tink/send", HTTP_POST,
         [this](AsyncWebServerRequest* request) { handleApiTinkSend(request); });
@@ -258,6 +262,63 @@ void WebServer::handleApiSave(AsyncWebServerRequest* request) {
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     } else {
         request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
+    }
+}
+
+void WebServer::handleApiConfigTriggers(AsyncWebServerRequest* request) {
+    if (!request->hasParam("triggers", true)) {
+        request->send(400, "application/json", "{\"error\":\"Missing triggers parameter\"}");
+        return;
+    }
+
+    String triggersJson = request->getParam("triggers", true)->value();
+
+    // Parse JSON array of triggers
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, triggersJson);
+
+    if (error) {
+        request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        return;
+    }
+
+    if (!doc.is<JsonArray>()) {
+        request->send(400, "application/json", "{\"error\":\"Triggers must be an array\"}");
+        return;
+    }
+
+    // Convert JSON to TriggerMapping vector
+    std::vector<TriggerMapping> triggers;
+    for (JsonObject triggerObj : doc.as<JsonArray>()) {
+        TriggerMapping trigger;
+        trigger.extronInput = triggerObj["input"] | 0;
+        trigger.profile = triggerObj["profile"] | 0;
+        trigger.name = triggerObj["name"] | "";
+
+        String mode = triggerObj["mode"] | "SVS";
+        trigger.mode = (mode == "Remote") ? TriggerMapping::REMOTE : TriggerMapping::SVS;
+
+        if (trigger.extronInput > 0 && trigger.profile > 0) {
+            triggers.push_back(trigger);
+        }
+    }
+
+    LOG_INFO("WebServer: Updating triggers (count: %d)", triggers.size());
+
+    // Update configuration
+    _config->setTriggers(triggers);
+    if (_config->saveConfig()) {
+        // Update RetroTink with new triggers
+        _tink->clearTriggers();
+        for (const auto& trigger : triggers) {
+            _tink->addTrigger(trigger);
+        }
+
+        request->send(200, "application/json", "{\"status\":\"ok\"}");
+        LOG_INFO("WebServer: Triggers saved successfully");
+    } else {
+        request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
+        LOG_ERROR("WebServer: Failed to save triggers");
     }
 }
 

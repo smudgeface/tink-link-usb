@@ -133,7 +133,7 @@
 
         <nav>
             <a href="/">Status</a>
-            <a href="/config.html">WiFi Config</a>
+            <a href="/config.html">Config</a>
             <a href="/debug.html">Debug</a>
             <a href="/api.html">API</a>
         </nav>
@@ -148,6 +148,7 @@
             <div class="toc">
                 <a href="#status">Status</a>
                 <a href="#wifi">WiFi</a>
+                <a href="#config">Config</a>
                 <a href="#tink">RetroTINK</a>
                 <a href="#switcher">Switcher</a>
                 <a href="#debug">Debug</a>
@@ -275,6 +276,43 @@
                 <div class="api-section">
                     <h4>Response</h4>
                     <div class="api-example">{ "status": "ok" }</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Config APIs -->
+        <div class="card" id="config">
+            <h2>Configuration</h2>
+
+            <div class="api-endpoint">
+                <span class="api-method post">POST</span>
+                <span class="api-path">/api/config/triggers</span>
+                <p class="api-desc">Update trigger mappings (switcher input to RetroTINK profile). Saves to flash and updates active configuration.</p>
+                <div class="api-section">
+                    <h4>Parameters</h4>
+                    <table class="param-table">
+                        <tr><th>Name</th><th>Type</th><th>Description</th></tr>
+                        <tr>
+                            <td><span class="param-name">triggers</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>JSON array of trigger objects<span class="param-required">required</span></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="api-section">
+                    <h4>Trigger Object Format</h4>
+                    <div class="api-example">{
+  "input": 1,        // Switcher input number (1-16)
+  "profile": 1,      // RetroTINK profile number (1-16)
+  "mode": "SVS",     // "SVS" or "Remote"
+  "name": "NES"      // Display name
+}</div>
+                </div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "status": "ok"
+}</div>
                 </div>
             </div>
         </div>
@@ -529,6 +567,12 @@
                 <h4>Connect to WiFi</h4>
                 <div class="api-example">curl -X POST http://tinklink.local/api/wifi/connect \
      -d "ssid=MyNetwork&password=secret123"</div>
+            </div>
+
+            <div class="api-section">
+                <h4>Update Triggers</h4>
+                <div class="api-example">curl -X POST http://tinklink.local/api/config/triggers \
+     -d 'triggers=[{"input":1,"profile":1,"mode":"SVS","name":"NES"},{"input":2,"profile":2,"mode":"SVS","name":"SNES"}]'</div>
             </div>
 
             <div class="api-section">

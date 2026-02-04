@@ -100,6 +100,7 @@ private:
     void handleApiConnect(AsyncWebServerRequest* request);
     void handleApiDisconnect(AsyncWebServerRequest* request);
     void handleApiSave(AsyncWebServerRequest* request);
+    void handleApiConfigTriggers(AsyncWebServerRequest* request);
     void handleApiTinkSend(AsyncWebServerRequest* request);
     void handleApiDebugLED(AsyncWebServerRequest* request);
     void handleApiSwitcherSend(AsyncWebServerRequest* request);

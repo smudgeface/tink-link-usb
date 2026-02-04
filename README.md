@@ -24,11 +24,12 @@ The original [TinkLink-Lite](https://github.com/smudgeface/tink-link-lite) proje
 ## Features
 
 - **USB Host Communication** - Direct USB serial connection to RetroTINK 4K
-- **Extron SW VGA Support** - Monitors Extron SW series VGA switchers via RS-232
-- **Web Interface** - Monitor status and configure WiFi from any browser
-- **System Console** - Web-based serial console for debugging and sending commands
+- **Video Switcher Support** - Monitors Extron SW series VGA switchers via RS-232 (modular design supports future switcher types)
+- **Web Interface** - Monitor status, configure WiFi, and manage input triggers from any browser
+- **Trigger Configuration** - Web-based interface to create and edit switcher input to RetroTINK profile mappings
+- **System Console** - Web-based serial console with live updates for debugging and sending commands
 - **OTA Updates** - Update firmware and filesystem over WiFi (no USB required)
-- **Centralized Logging** - Debug logs accessible via web interface and serial
+- **Centralized Logging** - Debug logs with timestamps accessible via web interface and serial
 - **mDNS Support** - Access via `http://tinklink.local`
 - **Persistent Configuration** - Settings stored in flash via LittleFS
 
@@ -338,6 +339,36 @@ TINKLINK_HOST=192.168.1.100 python scripts/logs.py
 
 Logs can also be viewed in the web interface at `http://tinklink.local` → Debug page.
 
+### Web Interface
+
+The web interface provides comprehensive configuration and monitoring capabilities:
+
+**Status Page** (`/`)
+- WiFi connection status and network information
+- Switcher status (type and current input)
+- RetroTINK last command
+- Configured input triggers
+
+**Config Page** (`/config.html`)
+- WiFi network scanning and connection management
+- Trigger configuration:
+  - View all switcher input to RetroTINK profile mappings
+  - Add new triggers (input, profile, mode, name)
+  - Edit existing triggers
+  - Delete triggers
+  - Live save to device flash
+
+**Debug Page** (`/debug.html`)
+- System console with live log updates and timestamps
+- Send commands to switcher or RetroTINK (when Phase 3 complete)
+- LED color testing
+- OTA firmware and filesystem updates
+
+**API Documentation** (`/api.html`)
+- Complete REST API reference
+- Request/response examples
+- Interactive "Try" buttons for GET endpoints
+
 ## Troubleshooting
 
 ### Device Won't Boot / Boot Loop
@@ -422,10 +453,12 @@ tink-link-usb/
 │   └── config_manager.cpp
 └── data/
     ├── index.html             # Status page
-    ├── config.html            # WiFi configuration
+    ├── config.html            # WiFi and trigger configuration
     ├── debug.html             # System console & OTA updates
-    ├── style.css
-    └── config.json
+    ├── api.html               # REST API documentation
+    ├── style.css              # Global styles
+    ├── config.json            # Default configuration
+    └── wifi.json              # WiFi credentials template
 ```
 
 ## Reference Projects

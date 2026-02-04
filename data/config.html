@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WiFi Config - TinkLink-USB</title>
+    <title>Configuration - TinkLink-USB</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
 
         <nav>
             <a href="/">Status</a>
-            <a href="/config.html">WiFi Config</a>
+            <a href="/config.html">Config</a>
             <a href="/debug.html">Debug</a>
             <a href="/api.html">API</a>
         </nav>
@@ -80,6 +80,47 @@
                 <div class="btn-row">
                     <button type="submit">Connect</button>
                     <button type="button" class="secondary" onclick="saveCredentials()">Save & Connect</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Input Triggers</h2>
+            <p style="margin-bottom: 15px; font-size: 0.9em; color: #888;">
+                Configure automatic RetroTINK profile switching when switcher inputs change.
+            </p>
+
+            <div id="trigger-list" style="margin-bottom: 20px;">
+                <div class="loading">Loading triggers...</div>
+            </div>
+
+            <h3 style="font-size: 1em; margin-bottom: 10px;">Add/Edit Trigger</h3>
+            <form id="trigger-form" onsubmit="return saveTrigger(event)">
+                <input type="hidden" id="trigger-index" value="-1">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 15px;">
+                    <div class="input-group">
+                        <label for="trigger-input">Switcher Input</label>
+                        <input type="number" id="trigger-input" min="1" max="16" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="trigger-profile">RetroTINK Profile</label>
+                        <input type="number" id="trigger-profile" min="1" max="16" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="trigger-mode">Mode</label>
+                        <select id="trigger-mode" required>
+                            <option value="SVS">SVS</option>
+                            <option value="Remote">Remote</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="trigger-name">Name</label>
+                        <input type="text" id="trigger-name" placeholder="e.g., NES" required>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="submit" id="trigger-submit-btn">Add Trigger</button>
+                    <button type="button" class="secondary" onclick="cancelTriggerEdit()">Cancel</button>
                 </div>
             </form>
         </div>
@@ -274,9 +315,130 @@
                 .catch(err => console.error('Disconnect failed:', err));
         }
 
+        // Trigger configuration
+        let triggers = [];
+
+        function loadTriggers() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    triggers = data.triggers || [];
+                    renderTriggers();
+                })
+                .catch(err => {
+                    console.error('Failed to load triggers:', err);
+                    document.getElementById('trigger-list').innerHTML =
+                        '<div class="loading" style="color: #dc3545;">Failed to load triggers</div>';
+                });
+        }
+
+        function renderTriggers() {
+            const list = document.getElementById('trigger-list');
+
+            if (triggers.length === 0) {
+                list.innerHTML = '<div class="loading">No triggers configured</div>';
+                return;
+            }
+
+            list.innerHTML = triggers.map((t, idx) => `
+                <div class="trigger-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #0f0f23; border-radius: 4px; margin-bottom: 8px;">
+                    <div>
+                        <strong>${t.name}</strong>
+                        <span style="color: #888; margin-left: 10px;">Input ${t.input} → Profile ${t.profile} (${t.mode})</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="secondary" onclick="editTrigger(${idx})" style="padding: 4px 10px; font-size: 0.85em;">Edit</button>
+                        <button class="secondary" onclick="deleteTrigger(${idx})" style="padding: 4px 10px; font-size: 0.85em; background: #dc3545;">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function saveTrigger(event) {
+            event.preventDefault();
+
+            const index = parseInt(document.getElementById('trigger-index').value);
+            const trigger = {
+                input: parseInt(document.getElementById('trigger-input').value),
+                profile: parseInt(document.getElementById('trigger-profile').value),
+                mode: document.getElementById('trigger-mode').value,
+                name: document.getElementById('trigger-name').value
+            };
+
+            if (index === -1) {
+                // Add new trigger
+                triggers.push(trigger);
+            } else {
+                // Update existing trigger
+                triggers[index] = trigger;
+            }
+
+            // Save to device
+            saveTriggers();
+
+            return false;
+        }
+
+        function editTrigger(index) {
+            const trigger = triggers[index];
+
+            document.getElementById('trigger-index').value = index;
+            document.getElementById('trigger-input').value = trigger.input;
+            document.getElementById('trigger-profile').value = trigger.profile;
+            document.getElementById('trigger-mode').value = trigger.mode;
+            document.getElementById('trigger-name').value = trigger.name;
+            document.getElementById('trigger-submit-btn').textContent = 'Update Trigger';
+
+            // Scroll to form
+            document.getElementById('trigger-form').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function deleteTrigger(index) {
+            if (!confirm(`Delete trigger "${triggers[index].name}"?`)) {
+                return;
+            }
+
+            triggers.splice(index, 1);
+            saveTriggers();
+        }
+
+        function cancelTriggerEdit() {
+            document.getElementById('trigger-form').reset();
+            document.getElementById('trigger-index').value = '-1';
+            document.getElementById('trigger-submit-btn').textContent = 'Add Trigger';
+        }
+
+        function saveTriggers() {
+            // Send triggers to device
+            const formData = new FormData();
+            formData.append('triggers', JSON.stringify(triggers));
+
+            fetch('/api/config/triggers', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage('Failed to save triggers: ' + data.error, 'error');
+                } else {
+                    showMessage('Triggers saved successfully', 'success');
+                    cancelTriggerEdit();
+                    renderTriggers();
+                }
+            })
+            .catch(err => {
+                showMessage('Failed to save triggers', 'error');
+                console.error('Save failed:', err);
+            });
+        }
+
         // Update status on load and periodically
         updateStatus();
         setInterval(updateStatus, 3000);
+
+        // Load triggers on page load
+        loadTriggers();
     </script>
 </body>
 </html>

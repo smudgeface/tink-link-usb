@@ -21,6 +21,11 @@ void RetroTink::addTrigger(const TriggerMapping& trigger) {
               trigger.extronInput, trigger.profile, modeStr);
 }
 
+void RetroTink::clearTriggers() {
+    _triggers.clear();
+    LOG_DEBUG("RetroTink: All triggers cleared");
+}
+
 void RetroTink::onExtronInputChange(int input) {
     const TriggerMapping* trigger = findTrigger(input);
 

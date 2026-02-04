@@ -36,21 +36,31 @@
 - [x] WiFi AP mode with automatic fallback
 - [x] WiFi STA mode with credential persistence
 - [x] mDNS working (http://tinklink.local)
-- [x] All web pages functional (status, config, debug)
-- [x] Centralized logging system (Logger class)
-- [x] Web-based System Console with target selector (Extron/RetroTINK)
-- [x] UART TX/RX to Extron via GPIO43/44
+- [x] All web pages functional (status, config, debug, API docs)
+- [x] Web-based trigger configuration (add/edit/delete input mappings)
+- [x] Centralized logging system with timestamps (Logger class)
+- [x] Web-based System Console with live updates and target selector (Switcher/RetroTINK)
+- [x] UART TX/RX to Extron via GPIO43/44 at 9600 baud 8N1
+- [x] Remote log monitoring (`scripts/logs.py`)
 - [x] OTA firmware updates via web interface
 - [x] OTA filesystem updates via web interface
 - [x] PlatformIO OTA automation (`pio run -t ota`, `pio run -t otafs`)
 - [x] Standalone OTA upload script (`scripts/ota_upload.py`)
+- [x] Configurable LED pin for multi-board support
+- [x] Modular switcher design (renamed Extron to Switcher in APIs)
 
 **Key Files Added/Modified**:
-- `src/logger.h`, `src/logger.cpp` - Centralized logging with circular buffer
-- `src/web_server.cpp` - OTA upload handlers, logs API endpoint
-- `data/debug.html` - System Console UI, OTA upload UI
+- `src/Logger.h`, `src/Logger.cpp` - Centralized logging with circular buffer
+- `src/WebServer.cpp` - OTA upload handlers, logs API endpoint, trigger configuration API
+- `src/RetroTink.cpp` - Added clearTriggers() method
+- `data/index.html` - Status page with switcher and trigger display
+- `data/config.html` - WiFi and trigger configuration interface
+- `data/debug.html` - System Console UI with live updates, OTA upload UI
+- `data/api.html` - REST API documentation
 - `scripts/ota_upload.py` - OTA automation for PlatformIO
+- `scripts/logs.py` - Remote log monitoring
 - `platformio.ini` - Added `extra_scripts` for OTA targets
+- `CLAUDE.md` - Development guide for AI assistants
 
 **Configuration**:
 ```ini

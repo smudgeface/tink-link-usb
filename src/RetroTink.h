@@ -61,6 +61,11 @@ public:
     void addTrigger(const TriggerMapping& trigger);
 
     /**
+     * Clear all trigger mappings.
+     */
+    void clearTriggers();
+
+    /**
      * Handle an Extron input change event.
      * Looks up the trigger for the input and sends the corresponding command.
      * @param input The new Extron input number (1-based)
