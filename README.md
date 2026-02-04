@@ -12,7 +12,7 @@ TinkLink-USB automatically triggers RetroTINK 4K profile changes when your video
 
 ## Why USB Instead of UART?
 
-The original [TinkLink-Lite](https://github.com/smudgeface/tink-link-lite) project used the RetroTINK's HD-15 (VGA) serial pins, which required:
+The original [TinkLink](https://github.com/Patrick-Working/tink-link) project used the RetroTINK's HD-15 (VGA) serial pins, which required:
 - Custom VGA cable adapter to access serial pins
 - RS-232 level shifter (MAX3232)
 - Careful wiring to avoid interfering with VGA video signal
