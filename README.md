@@ -176,9 +176,13 @@ SVS NEW INPUT=2\r\n    # Switch to input 2 and load S2_*.rt4 profile
    - **Recommended**: [Waveshare ESP32-S3-Zero](https://www.aliexpress.com/item/1005006963045909.html) (compact, castellated holes, onboard RGB LED)
    - Alternatives: ESP32-S3-DevKitC-1, M5Stack ATOMS3, or M5Stack StampS3
 
+   <img src="assets/hardware/esp32-s3-zero.jpg" width="400" alt="Waveshare ESP32-S3-Zero">
+
 3. **RS-232 to TTL Adapter** - For Extron switcher connection
    - [DB9 RS232 to TTL Module (MAX3232)](https://www.aliexpress.com/item/1005009105067080.html)
    - Converts Extron's RS-232 levels to ESP32 3.3V UART
+
+   <img src="assets/hardware/rs232-ttl-module.jpg" width="400" alt="DB9 RS232 to TTL Module">
 
 4. **USB OTG Cable** - For connecting ESP32-S3 to RetroTINK 4K (Phase 3)
 
