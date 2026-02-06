@@ -11,27 +11,27 @@
     "triggers": [
         {
             "input": 1,
-            "mode": "SVS",
+            "mode": "Remote",
             "profile": 1,
             "name": "NES"
         },
         {
             "input": 2,
-            "mode": "SVS",
+            "mode": "Remote",
             "profile": 2,
             "name": "SNES"
         },
         {
             "input": 3,
-            "mode": "SVS",
+            "mode": "Remote",
             "profile": 3,
-            "name": "Genesis"
+            "name": "N64"
         },
         {
             "input": 4,
-            "mode": "SVS",
+            "mode": "Remote",
             "profile": 4,
-            "name": "PlayStation"
+            "name": "Wii"
         }
     ]
 }

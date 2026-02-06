@@ -167,11 +167,11 @@
                 <span class="api-method get">GET</span>
                 <span class="api-path">/api/status</span>
                 <button class="secondary try-btn" onclick="tryApi('GET', '/api/status')">Try</button>
-                <p class="api-desc">Get system status including WiFi, Extron input, and trigger configuration.</p>
+                <p class="api-desc">Get system status including WiFi, switcher, RetroTINK, and trigger configuration.</p>
                 <div class="api-section">
                     <h4>Response</h4>
                     <div class="api-example">{
-  "version": "1.4.0",
+  "version": "1.5.0",
   "wifi": {
     "connected": true,
     "ssid": "MyNetwork",
@@ -185,6 +185,8 @@
     "currentInput": 1
   },
   "tink": {
+    "connected": true,
+    "powerState": "on",
     "lastCommand": "SVS NEW INPUT=1"
   },
   "triggers": [
@@ -324,7 +326,7 @@
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/tink/send</span>
-                <p class="api-desc">Send a command to RetroTINK 4K (currently stub mode - logged only until USB Host is implemented).</p>
+                <p class="api-desc">Send a command to RetroTINK 4K via USB Host serial. Command is framed with CR and sent at 115200 baud.</p>
                 <div class="api-section">
                     <h4>Parameters</h4>
                     <table class="param-table">

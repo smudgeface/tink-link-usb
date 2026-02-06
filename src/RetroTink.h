@@ -4,6 +4,8 @@
 #include <Arduino.h>
 #include <vector>
 
+class UsbHostSerial;
+
 /**
  * Mapping from Extron input number to RetroTINK 4K profile.
  *
@@ -25,34 +27,69 @@ struct TriggerMapping {
 };
 
 /**
- * RetroTINK 4K controller via USB serial.
+ * RetroTINK 4K power state.
  *
- * Currently a stub implementation that logs commands without sending.
- * Phase 3 will implement actual USB Host FTDI communication.
+ * Tracked by parsing serial messages from the RT4K:
+ * - "[MCU] Powering Up" -> BOOTING
+ * - "[MCU] Boot Sequence Complete..." -> ON
+ * - "Power Off" or "Entering Sleep" -> SLEEPING
+ */
+enum class RT4KPowerState {
+    UNKNOWN,   ///< Initial state or unable to determine
+    WAKING,    ///< pwr on sent from UNKNOWN state, waiting briefly for RT4K response
+    BOOTING,   ///< RT4K confirmed powering up, waiting for boot complete
+    ON,        ///< Fully booted and ready for commands
+    SLEEPING   ///< In sleep/standby mode
+};
+
+/**
+ * RetroTINK 4K controller via USB Host FTDI serial.
  *
- * The RetroTINK 4K accepts commands at 115200 baud over its USB-C port,
- * which appears as an FTDI FT232R device (VID:0403, PID:6001).
+ * Communicates with the RetroTINK 4K over its USB-C port, which appears
+ * as an FTDI FT232R device (VID:0x0403, PID:0x6001) at 115200 baud 8N1.
  *
- * Supported command formats:
- * - "remote profN" - Emulate IR remote profile button
- * - "SVS NEW INPUT=N" - SVS protocol for profile switching
+ * Features:
+ * - Profile switching via SVS or remote commands
+ * - Power state tracking (parses RT4K serial output)
+ * - Auto-wake: powers on RT4K when input changes during sleep
+ * - SVS keep-alive: sends "SVS CURRENT INPUT=N" after initial switch
+ *
+ * Command framing: "\r<COMMAND>\r"
+ * - Leading CR clears any partial input in RT4K's buffer
+ * - Trailing CR terminates the command
  *
  * Usage:
- *   RetroTink tink;
+ *   UsbHostSerial usb;
+ *   RetroTink tink(&usb);
  *   tink.begin();
  *   tink.addTrigger({1, TriggerMapping::SVS, 1, "Console 1"});
+ *   // In loop():
+ *   tink.update();
  *   tink.onExtronInputChange(1);  // Sends "SVS NEW INPUT=1"
  */
 class RetroTink {
 public:
-    RetroTink();
+    /**
+     * Create RetroTINK controller with USB Host serial.
+     * @param usb Pointer to UsbHostSerial instance (nullptr for stub mode)
+     */
+    explicit RetroTink(UsbHostSerial* usb = nullptr);
     ~RetroTink();
 
     /**
      * Initialize the RetroTINK controller.
-     * In Phase 3, this will initialize USB Host.
+     * Logs USB Host or stub mode status.
      */
     void begin();
+
+    /**
+     * Process USB serial data and pending commands.
+     * Must be called in loop(). Handles:
+     * - Reading and parsing incoming RT4K serial data
+     * - Sending pending commands after boot completes
+     * - SVS keep-alive timing
+     */
+    void update();
 
     /**
      * Add a trigger mapping from Extron input to RetroTINK profile.
@@ -67,7 +104,8 @@ public:
 
     /**
      * Handle an Extron input change event.
-     * Looks up the trigger for the input and sends the corresponding command.
+     * If RT4K is sleeping, sends power-on first and queues the profile command.
+     * If RT4K is on, sends the profile command immediately.
      * @param input The new Extron input number (1-based)
      */
     void onExtronInputChange(int input);
@@ -80,11 +118,22 @@ public:
     void sendRawCommand(const String& command);
 
     /**
-     * Send repeated test signals for oscilloscope testing.
-     * Useful for verifying USB serial timing.
-     * @param count Number of test signals to send (default 10)
+     * Check whether the RT4K USB device is connected.
+     * @return true if FTDI device is detected and ready
      */
-    void sendContinuousTest(int count = 10);
+    bool isConnected() const;
+
+    /**
+     * Get the current RT4K power state.
+     * @return Current power state enum value
+     */
+    RT4KPowerState getPowerState() const { return _powerState; }
+
+    /**
+     * Get the power state as a human-readable string.
+     * @return "unknown", "booting", "on", or "sleeping"
+     */
+    const char* getPowerStateString() const;
 
     /**
      * Get the last command that was sent (or would be sent in stub mode).
@@ -93,8 +142,25 @@ public:
     String getLastCommand() const { return _lastCommand; }
 
 private:
+    UsbHostSerial* _usb;
     std::vector<TriggerMapping> _triggers;
     String _lastCommand;
+
+    // Power state tracking
+    RT4KPowerState _powerState;
+    String _serialLineBuffer;
+
+    // Pending command (queued during boot)
+    String _pendingCommand;
+    unsigned long _bootWaitStart;
+    static const unsigned long BOOT_TIMEOUT_MS = 15000;
+    static const unsigned long WAKE_RESPONSE_TIMEOUT_MS = 3000;
+
+    // SVS keep-alive
+    int _lastSvsInput;
+    unsigned long _svsKeepAliveTime;
+    bool _svsKeepAlivePending;
+    static const unsigned long SVS_KEEPALIVE_DELAY_MS = 1000;
 
     /**
      * Find the trigger mapping for a given Extron input.
@@ -111,12 +177,30 @@ private:
     String generateCommand(const TriggerMapping& trigger) const;
 
     /**
-     * Send a command to the RetroTINK.
-     * Currently logs to debug output (stub mode).
-     * Phase 3 will send via USB Host FTDI.
+     * Send a framed command to the RetroTINK via USB.
+     * Frames as "\r<command>\r" for proper RT4K parsing.
+     * Falls back to stub logging if USB is not available.
      * @param command The command to send
      */
     void sendCommand(const String& command);
+
+    /**
+     * Process a complete line received from the RT4K serial output.
+     * Updates power state based on known status messages.
+     * @param line The received line (without terminator)
+     */
+    void processReceivedLine(const String& line);
+
+    /**
+     * Read and process incoming serial data from the RT4K.
+     * Assembles characters into lines and calls processReceivedLine().
+     */
+    void processIncomingData();
+
+    /**
+     * Handle pending operations: boot timeout, SVS keep-alive.
+     */
+    void processPendingOperations();
 };
 
 #endif // RETROTINK_H

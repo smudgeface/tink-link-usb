@@ -87,6 +87,21 @@ public:
      */
     static const char* getTypeName() { return "Extron SW VGA"; }
 
+    /**
+     * Enable or disable signal-based auto-switching.
+     * When enabled, Sig messages (e.g., "Sig 0 1 0 0") are parsed and
+     * debounced. After the signal state is stable for 3 seconds, the
+     * switcher automatically switches to the highest active input.
+     * @param enabled true to enable auto-switching
+     */
+    void setAutoSwitchEnabled(bool enabled) { _autoSwitchEnabled = enabled; }
+
+    /**
+     * Check if signal-based auto-switching is enabled.
+     * @return true if auto-switching is enabled
+     */
+    bool isAutoSwitchEnabled() const { return _autoSwitchEnabled; }
+
 private:
     uint8_t _txPin;
     uint8_t _rxPin;
@@ -101,9 +116,22 @@ private:
     static const int MAX_RECENT_MESSAGES = 50;
     std::vector<String> _recentMessages;
 
+    // Signal detection auto-switch
+    static const int MAX_SIG_INPUTS = 16;
+    static const unsigned long SIG_DEBOUNCE_MS = 2000;
+    bool _autoSwitchEnabled;
+    bool _signalWasLost;                  ///< True if stable state went to all-zero
+    int _lastSigState[MAX_SIG_INPUTS];    ///< Most recently parsed signal state
+    int _stableSigState[MAX_SIG_INPUTS];  ///< Last signal state we acted on
+    int _numSigInputs;                    ///< Number of inputs in Sig messages
+    unsigned long _sigChangeTime;         ///< When _lastSigState last changed
+
     void processLine(const String& line);
     bool isInputMessage(const String& line);
     int parseInputNumber(const String& line);
+    bool isSigMessage(const String& line);
+    void parseSigMessage(const String& line);
+    void processAutoSwitch();
 };
 
 #endif // EXTRON_SW_VGA_H

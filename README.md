@@ -1,6 +1,6 @@
 # TinkLink-USB
 
-> 🚧 **Status**: Phase 2 Complete - WiFi, LED, Web Console, OTA Updates working. USB Host implementation next.
+> **Status**: Phase 3 Complete - USB Host communication with RetroTINK 4K working. WiFi, LED, Web Console, OTA Updates all functional.
 
 A USB-based ESP32-S3 bridge between video switchers and the RetroTINK 4K.
 
@@ -25,13 +25,16 @@ The original [TinkLink](https://github.com/Patrick-Working/tink-link) project us
 
 ## Features
 
-- **USB Host Communication** - Direct USB serial connection to RetroTINK 4K
+- **USB Host Communication** - Direct USB serial connection to RetroTINK 4K via FTDI FT232R
+- **RT4K Power State Tracking** - Detects boot complete and power-off events via serial, auto-wakes RT4K when input changes arrive while sleeping
+- **Signal Detection Auto-Switch** - Parses Extron signal detection messages (`Sig`) to automatically switch inputs when a video source is powered on, with 2-second debounce to filter glitches
+- **SVS & Remote Commands** - Supports both SVS (Scalable Video Switch) and Remote profile loading modes with automatic keep-alive
 - **Video Switcher Support** - Monitors Extron SW series VGA switchers via RS-232 (modular design supports future switcher types)
 - **Web Interface** - Monitor status, configure WiFi, and manage input triggers from any browser
 - **Trigger Configuration** - Web-based interface to create and edit switcher input to RetroTINK profile mappings
-- **System Console** - Web-based serial console with live updates for debugging and sending commands
+- **System Console** - Web-based debug console with live log streaming and command sending to switcher or RetroTINK
 - **OTA Updates** - Update firmware and filesystem over WiFi (no USB required)
-- **Centralized Logging** - Debug logs with timestamps accessible via web interface and serial
+- **Centralized Logging** - Debug logs with timestamps accessible via web interface and `scripts/logs.py`
 - **mDNS Support** - Access via `http://tinklink.local`
 - **Persistent Configuration** - Settings stored in flash via LittleFS
 
@@ -80,7 +83,7 @@ The **Waveshare ESP32-S3-Zero** is highly suitable for this project:
 - **GPIO21**: WS2812 RGB LED (status indicator)
 - **GPIO43**: UART0 TX (Extron switcher communication, 9600 baud)
 - **GPIO44**: UART0 RX (Extron switcher communication)
-- **GPIO19/20**: USB OTG (RetroTINK communication - Phase 3)
+- **GPIO19/20**: USB OTG (RetroTINK communication)
 
 **USB Host Configuration:**
 
@@ -192,13 +195,13 @@ SVS NEW INPUT=2\r\n    # Switch to input 2 and load S2_*.rt4 profile
 
    <img src="assets/hardware/db9-to-3.5mm-adapter.jpg" width="400" alt="DB9 to 3.5mm Stereo Adapter">
 
-5. **USB OTG Cable** - For connecting ESP32-S3 to RetroTINK 4K (Phase 3)
+5. **USB OTG Cable** - For connecting ESP32-S3 to RetroTINK 4K
 
 6. **2.4GHz WiFi network** - For web interface access
 
 ### Installation
 
-**Current Status - Phase 2**: WiFi and LED functionality working, USB Host implementation in progress.
+**Current Status - Phase 3 Complete**: USB Host communication with RetroTINK 4K working. Device runs in USB OTG mode.
 
 #### Step 1: Clone the Repository
 
@@ -231,7 +234,7 @@ pio run -e esp32s3 -t upload
 
 The device will automatically reset after upload.
 
-**Note**: In Phase 3 (USB Host mode), CDC will be disabled and USB uploads will require manually entering bootloader mode, or using OTA updates instead. To enter bootloader mode:
+**Note**: The firmware runs in USB OTG mode (USB Host for RetroTINK communication). USB CDC is disabled, so USB uploads require manually entering bootloader mode, or using OTA updates instead. To enter bootloader mode:
 1. Hold the **BOOT** button
 2. Press and release **RESET** (or unplug/replug USB)
 3. Release **BOOT** - device is now waiting for upload
@@ -293,7 +296,7 @@ For convenience, here's the complete sequence to build and flash everything:
 pio run -e esp32s3 -t upload && pio run -e esp32s3 -t uploadfs
 ```
 
-**Note**: USB Host functionality (Phase 3) not yet implemented. See [implementation-plan.md](implementation-plan.md) for roadmap.
+**Note**: The firmware runs in USB OTG mode. After the first USB upload, subsequent updates should use OTA. See [implementation-plan.md](implementation-plan.md) for development history.
 
 ### OTA (Over-The-Air) Updates
 
@@ -364,7 +367,7 @@ The web interface provides comprehensive configuration and monitoring capabiliti
 **Status Page** (`/`)
 - WiFi connection status and network information
 - Switcher status (type and current input)
-- RetroTINK last command
+- RetroTINK USB connection status, power state, and last command
 - Configured input triggers
 
 **Config Page** (`/config.html`)
@@ -378,7 +381,7 @@ The web interface provides comprehensive configuration and monitoring capabiliti
 
 **Debug Page** (`/debug.html`)
 - System console with live log updates and timestamps
-- Send commands to switcher or RetroTINK (when Phase 3 complete)
+- Send commands to switcher or RetroTINK
 - LED color testing
 - OTA firmware and filesystem updates
 
@@ -469,9 +472,11 @@ tink-link-usb/
 │   ├── version.h              # Semantic version defines
 │   ├── Logger.h               # Centralized logging system
 │   ├── Logger.cpp
+│   ├── UsbHostSerial.h        # USB Host FTDI serial driver
+│   ├── UsbHostSerial.cpp
 │   ├── ExtronSwVga.h          # Extron switcher UART handler
 │   ├── ExtronSwVga.cpp
-│   ├── RetroTink.h            # RetroTINK 4K controller (stub)
+│   ├── RetroTink.h            # RetroTINK 4K controller (USB Host)
 │   ├── RetroTink.cpp
 │   ├── WifiManager.h          # WiFi STA/AP management
 │   ├── WifiManager.cpp

@@ -38,7 +38,7 @@
                 <div style="display: flex; background: #2d2d30; border-radius: 0 0 4px 4px; overflow: hidden; align-items: center;">
                     <select id="console-target" style="background: #3e3e42; color: #d4d4d4; border: none; padding: 8px 4px 8px 8px; font-size: 0.8em; outline: none; cursor: pointer; width: 80px;">
                         <option value="extron">Switcher</option>
-                        <option value="tink" disabled>Tink</option>
+                        <option value="tink">Tink</option>
                     </select>
                     <span style="color: #569cd6; font-family: 'Courier New', monospace; font-weight: bold; padding: 10px 8px 10px 8px;">&gt;</span>
                     <input type="text" id="console-input" placeholder="Enter command..."
@@ -58,8 +58,8 @@
                     </div>
                     <div style="display: flex; gap: 6px; align-items: center;">
                         <span style="font-size: 0.75em; color: #666;">RetroTINK:</span>
-                        <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=1', 'tink')" style="font-size: 0.8em; padding: 4px 10px;" disabled>Profile 1</button>
-                        <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=2', 'tink')" style="font-size: 0.8em; padding: 4px 10px;" disabled>Profile 2</button>
+                        <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=1', 'tink')" style="font-size: 0.8em; padding: 4px 10px;">Profile 1</button>
+                        <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=2', 'tink')" style="font-size: 0.8em; padding: 4px 10px;">Profile 2</button>
                     </div>
                 </div>
                 <button type="button" class="secondary" onclick="clearConsole()" style="padding: 6px 12px; font-size: 0.8em;">Clear</button>
@@ -147,12 +147,12 @@
 
         <div class="card">
             <h2>Implementation Status</h2>
-            <p><strong>Current Phase: WiFi & LED Testing (Phase 2)</strong></p>
+            <p><strong>Current Phase: USB Host Communication (Phase 3)</strong></p>
 
             <p><strong>Hardware Configuration:</strong></p>
             <ul>
-                <li><strong>Extron Input:</strong> UART0 on TX:GPIO43, RX:GPIO44 @ 9600 baud</li>
-                <li><strong>RetroTINK Output:</strong> USB Host (not yet implemented)</li>
+                <li><strong>Extron Input:</strong> UART1 on TX:GPIO43, RX:GPIO44 @ 9600 baud</li>
+                <li><strong>RetroTINK Output:</strong> USB Host FTDI on GPIO19/20 @ 115200 baud</li>
                 <li><strong>Status LED:</strong> WS2812 RGB on GPIO21</li>
             </ul>
 
@@ -160,11 +160,11 @@
             <ul>
                 <li>✅ Phase 1: Base framework & CDC mode</li>
                 <li>✅ Phase 2: WiFi & LED functionality</li>
-                <li>⏳ Phase 3: USB Host implementation for RetroTINK communication</li>
+                <li>✅ Phase 3: USB Host FTDI serial for RetroTINK 4K</li>
             </ul>
 
-            <p><strong>Note:</strong> Commands sent via this page are currently logged to serial only.
-            USB Host communication will be implemented in Phase 3.</p>
+            <p><strong>Note:</strong> USB is in OTG mode (no CDC serial). Use this web console
+            or <code>scripts/logs.py</code> for debugging.</p>
         </div>
     </div>
 
@@ -246,7 +246,6 @@
         // Serial Console functions
         let consoleAutoRefreshInterval = null;
         let consoleAutoScroll = true;
-        let lastUartCount = 0;
         let lastLogCount = 0;
 
         function formatTimestamp(ms) {
@@ -324,9 +323,6 @@
                 return false;
             }
 
-            // Display command in console with target prefix
-            appendToConsole(command, 'tx-' + target);
-
             // Route to appropriate API
             let apiUrl = '/api/switcher/send';
             let bodyParam = 'message';
@@ -346,8 +342,6 @@
                 if (data.error) {
                     appendToConsole('Error: ' + data.error, 'system');
                 }
-                // Poll for response after short delay
-                setTimeout(refreshConsoleMessages, 100);
             })
             .catch(err => {
                 appendToConsole('Failed to send command', 'system');
@@ -368,23 +362,14 @@
             sendConsoleCommand(new Event('submit'), target);
         }
 
-        function refreshConsoleMessages() {
-            // Fetch both switcher messages and system logs
-            Promise.all([
-                fetch('/api/switcher/receive?count=50').then(r => r.json()),
-                fetch('/api/logs?since=' + lastLogCount + '&count=50').then(r => r.json())
-            ])
-            .then(([uartData, logData]) => {
-                // Append new UART messages (from Extron)
-                if (uartData.count > lastUartCount) {
-                    const newMessages = uartData.messages.slice(lastUartCount);
-                    newMessages.forEach(msg => {
-                        appendToConsole(msg, 'rx-extron');
-                    });
-                    lastUartCount = uartData.count;
-                }
+        function scheduleRefresh() {
+            consoleAutoRefreshInterval = setTimeout(refreshConsoleMessages, 1000);
+        }
 
-                // Append new system logs
+        function refreshConsoleMessages() {
+            fetch('/api/logs?since=' + lastLogCount + '&count=50')
+            .then(r => r.json())
+            .then(logData => {
                 if (logData.logs && logData.logs.length > 0) {
                     logData.logs.forEach(log => {
                         appendToConsole(log.msg, getLogType(log.lvl), log.ts);
@@ -393,7 +378,10 @@
                 }
             })
             .catch(err => {
-                console.error('Failed to refresh console messages:', err);
+                console.error('Failed to refresh console:', err);
+            })
+            .finally(() => {
+                scheduleRefresh();
             });
         }
 
@@ -401,17 +389,13 @@
             const consoleOutput = document.getElementById('console-output');
             consoleOutput.innerHTML = '<span style="color: #569cd6;">TinkLink-USB Serial Console</span>\n<span style="color: #6a9955;">Ready. Type commands below and press Enter to send.</span>\n\n';
 
-            // Clear server-side messages and logs
-            Promise.all([
-                fetch('/api/switcher/receive?clear=1'),
-                fetch('/api/logs?clear=1')
-            ])
+            // Clear server-side log buffer
+            fetch('/api/logs?clear=1')
             .then(() => {
-                lastUartCount = 0;
                 lastLogCount = 0;
             })
             .catch(err => {
-                console.error('Failed to clear messages:', err);
+                console.error('Failed to clear logs:', err);
             });
         }
 
@@ -522,7 +506,7 @@
                 document.getElementById('version').textContent = 'v' + data.version;
             });
 
-            // Load recent logs to show startup messages
+            // Load recent logs to show startup messages, then start polling
             fetch('/api/logs?count=50')
             .then(r => r.json())
             .then(data => {
@@ -532,13 +516,14 @@
                     });
                     lastLogCount = data.total;
                 }
+                // Start live updates only after initial load completes
+                scheduleRefresh();
             })
             .catch(err => {
                 console.error('Failed to load initial logs:', err);
+                // Start polling even if initial load fails
+                scheduleRefresh();
             });
-
-            // Start live updates automatically
-            consoleAutoRefreshInterval = setInterval(refreshConsoleMessages, 1000);
         });
     </script>
 </body>

@@ -38,7 +38,11 @@
         </div>
 
         <div class="card">
-            <h2>Switcher <span id="switcher-type" class="version"></span></h2>
+            <h2>Switcher</h2>
+            <div class="status-item">
+                <span class="status-label">Type</span>
+                <span class="status-value" id="switcher-type">--</span>
+            </div>
             <div class="status-item">
                 <span class="status-label">Current Input</span>
                 <span class="status-value" id="switcher-input">--</span>
@@ -47,6 +51,14 @@
 
         <div class="card">
             <h2>RetroTINK 4K</h2>
+            <div class="status-item">
+                <span class="status-label">Connection</span>
+                <span class="status-value" id="tink-connected">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Power State</span>
+                <span class="status-value" id="tink-power">--</span>
+            </div>
             <div class="status-item">
                 <span class="status-label">Last Command</span>
                 <span class="status-value" id="tink-command">--</span>
@@ -79,10 +91,12 @@
                     document.getElementById('wifi-rssi').textContent = data.wifi.rssi ? data.wifi.rssi + ' dBm' : '--';
 
                     // Switcher status
-                    document.getElementById('switcher-type').textContent = data.switcher.type || '';
+                    document.getElementById('switcher-type').textContent = data.switcher.type || '--';
                     document.getElementById('switcher-input').textContent = data.switcher.currentInput || '--';
 
                     // RetroTINK status
+                    document.getElementById('tink-connected').textContent = data.tink.connected ? 'Connected' : 'Disconnected';
+                    document.getElementById('tink-power').textContent = data.tink.powerState || '--';
                     document.getElementById('tink-command').textContent = data.tink.lastCommand || '--';
 
                     // Triggers

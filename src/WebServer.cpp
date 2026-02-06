@@ -159,6 +159,8 @@ void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
     doc["switcher"]["currentInput"] = _extron->getCurrentInput();
 
     // RetroTINK status
+    doc["tink"]["connected"] = _tink->isConnected();
+    doc["tink"]["powerState"] = _tink->getPowerStateString();
     doc["tink"]["lastCommand"] = _tink->getLastCommand();
 
     // Triggers

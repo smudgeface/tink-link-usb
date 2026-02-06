@@ -2,6 +2,7 @@
 #include <FastLED.h>
 #include "ConfigManager.h"
 #include "ExtronSwVga.h"
+#include "UsbHostSerial.h"
 #include "RetroTink.h"
 #include "WifiManager.h"
 #include "WebServer.h"
@@ -19,6 +20,7 @@ uint8_t ledPin = 21;  // Default for Waveshare ESP32-S3-Zero
 
 // Global instances
 ConfigManager configManager;
+UsbHostSerial usbHost;
 ExtronSwVga* extron = nullptr;
 RetroTink* tink = nullptr;
 WifiManager wifiManager;
@@ -72,9 +74,9 @@ void setLEDColor(int r, int g, int b) {
 }
 
 void setup() {
-    // Initialize serial for debug output
-    Serial.begin(115200);
-    delay(1000);  // Give USB CDC time to connect
+    // USB is in OTG mode - no CDC serial available
+    // Disable serial output in logger since there's no CDC
+    Logger::instance().setSerialEnabled(false);
 
     // Initialize logger
     Logger::instance().begin();
@@ -87,7 +89,7 @@ void setup() {
     LOG_RAW("\n");
 
     // Initialize configuration manager (LittleFS) - load before hardware init
-    LOG_INFO("[1/5] Initializing configuration...");
+    LOG_INFO("[1/6] Initializing configuration...");
     if (!configManager.begin()) {
         LOG_ERROR("Failed to initialize configuration manager!");
     }
@@ -145,9 +147,13 @@ void setup() {
     leds[0] = CRGB::Black;
     FastLED.show();
 
-    // Initialize RetroTINK controller (stub mode for now)
-    LOG_INFO("[2/5] Initializing RetroTINK controller...");
-    tink = new RetroTink();
+    // Initialize USB Host for RetroTINK communication
+    LOG_INFO("[2/6] Initializing USB Host...");
+    usbHost.begin();
+
+    // Initialize RetroTINK controller with USB Host
+    LOG_INFO("[3/6] Initializing RetroTINK controller...");
+    tink = new RetroTink(&usbHost);
     tink->begin();
 
     // Load triggers from config
@@ -156,11 +162,14 @@ void setup() {
     }
 
     // Initialize video switcher
-    LOG_INFO("[3/5] Initializing %s...", switcherConfig.type.c_str());
+    LOG_INFO("[4/6] Initializing %s...", switcherConfig.type.c_str());
     extron = new ExtronSwVga(switcherConfig.txPin, switcherConfig.rxPin, 9600);
     if (!extron->begin()) {
         LOG_ERROR("Failed to initialize Extron handler!");
     }
+
+    // Enable signal-based auto-switching
+    extron->setAutoSwitchEnabled(true);
 
     // Connect Extron input changes to RetroTINK
     extron->onInputChange([](int input) {
@@ -169,7 +178,7 @@ void setup() {
     });
 
     // Initialize WiFi manager
-    LOG_INFO("[4/5] Initializing WiFi...");
+    LOG_INFO("[5/6] Initializing WiFi...");
     wifiManager.begin(wifiConfig.hostname);
 
     // Set up WiFi state change callback
@@ -204,7 +213,7 @@ void setup() {
     }
 
     // Initialize web server
-    LOG_INFO("[5/5] Starting web server...");
+    LOG_INFO("[6/6] Starting web server...");
     webServer.begin(&wifiManager, &configManager, extron, tink);
     webServer.setLEDCallback(setLEDColor);
 
@@ -217,8 +226,9 @@ void setup() {
     LOG_INFO("  Switcher TX:  GPIO%d", switcherConfig.txPin);
     LOG_INFO("  Switcher RX:  GPIO%d", switcherConfig.rxPin);
     LOG_INFO("  RGB LED:      GPIO%d", ledPin);
-    LOG_INFO("USB Mode: CDC (Serial debugging enabled)");
-    LOG_INFO("Note: USB Host for RetroTINK not yet implemented");
+    LOG_INFO("  USB Host:     GPIO19 (D-) / GPIO20 (D+)");
+    LOG_INFO("USB Mode: OTG (USB Host for RetroTINK 4K)");
+    LOG_INFO("Serial debugging: disabled (use web console or scripts/logs.py)");
     if (wifiManager.isAPActive()) {
         LOG_INFO("Web interface: http://%s", wifiManager.getIP().c_str());
     } else {
@@ -232,6 +242,9 @@ void loop() {
 
     // Process incoming Extron messages
     extron->update();
+
+    // Process USB Host events and RT4K communication
+    tink->update();
 
     // Check for manual LED mode timeout
     unsigned long now = millis();

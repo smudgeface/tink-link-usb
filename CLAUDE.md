@@ -6,14 +6,15 @@ This document provides guidelines and conventions for Claude (AI assistant) when
 
 TinkLink-USB is an ESP32-S3 USB bridge between video switchers and the RetroTINK 4K. It automatically triggers RetroTINK profile changes when video switcher inputs change.
 
-**Current Status:** Phase 2 Complete - WiFi, LED, Web Console, OTA working. USB Host implementation is next (Phase 3).
+**Current Status:** Phase 3 Complete - USB Host communication with RetroTINK 4K working. WiFi, LED, Web Console, OTA all functional. Version 1.5.0.
 
 **Tech Stack:**
-- Platform: ESP32-S3 (Arduino framework)
+- Platform: ESP32-S3 (Arduino framework, USB OTG mode)
 - Build System: PlatformIO
 - Filesystem: LittleFS
 - Web Server: ESPAsyncWebServer
 - LED Control: FastLED (WS2812)
+- USB Host: EspUsbHost (FTDI FT232R for RetroTINK 4K)
 - Configuration: ArduinoJson
 
 ## Git & Version Control Rules
@@ -223,11 +224,11 @@ pio run -e esp32s3
 # Build filesystem
 pio run -t buildfs -e esp32s3
 
-# Upload via USB (CDC mode)
+# Upload via USB (requires bootloader mode since CDC is disabled)
 pio run -t upload -e esp32s3
 pio run -t uploadfs -e esp32s3
 
-# Upload via OTA (when USB unavailable)
+# Upload via OTA (preferred - device runs in USB OTG mode)
 pio run -t ota -e esp32s3
 pio run -t otafs -e esp32s3
 ```
@@ -342,8 +343,9 @@ tink-link-usb/
 │   ├── WebServer.*    # HTTP server & API handlers
 │   ├── WifiManager.*  # WiFi connection management
 │   ├── ConfigManager.* # Configuration persistence
+│   ├── UsbHostSerial.* # USB Host FTDI serial driver
 │   ├── ExtronSwVga.*  # Video switcher protocol handler
-│   ├── RetroTink.*    # RetroTINK command interface
+│   ├── RetroTink.*    # RetroTINK 4K controller (USB Host)
 │   ├── Logger.*       # Centralized logging
 │   └── version.h      # Version definitions
 ├── scripts/           # Helper scripts
@@ -368,14 +370,14 @@ tink-link-usb/
 ### UART Configuration
 
 - **Switcher UART**: GPIO43 (TX), GPIO44 (RX) @ 9600 baud, 8N1
-- **RetroTINK USB**: USB Host (Phase 3, not yet implemented)
+- **RetroTINK USB**: USB Host via EspUsbHost library, FTDI FT232R @ 115200 baud
 
 ### Important GPIO Pins
 
 - GPIO21: WS2812 RGB LED
 - GPIO43: Switcher TX (UART0)
 - GPIO44: Switcher RX (UART0)
-- GPIO19/20: USB Host D-/D+ (future Phase 3)
+- GPIO19/20: USB Host D-/D+ (USB OTG mode)
 
 ## References
 
@@ -386,4 +388,4 @@ tink-link-usb/
 
 ---
 
-**Last Updated**: 2025 (v1.3.0)
+**Last Updated**: 2025 (v1.5.0)
