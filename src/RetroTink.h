@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <vector>
 
-class UsbHostSerial;
+class SerialInterface;
 
 /**
  * Mapping from Extron input number to RetroTINK 4K profile.
@@ -43,10 +43,10 @@ enum class RT4KPowerState {
 };
 
 /**
- * RetroTINK 4K controller via USB Host FTDI serial.
+ * RetroTINK 4K controller via serial interface.
  *
- * Communicates with the RetroTINK 4K over its USB-C port, which appears
- * as an FTDI FT232R device (VID:0x0403, PID:0x6001) at 115200 baud 8N1.
+ * Communicates with the RetroTINK 4K over a SerialInterface transport
+ * (typically USB FTDI at 115200 baud 8N1).
  *
  * Features:
  * - Profile switching via SVS or remote commands
@@ -70,20 +70,20 @@ enum class RT4KPowerState {
 class RetroTink {
 public:
     /**
-     * Create RetroTINK controller with USB Host serial.
-     * @param usb Pointer to UsbHostSerial instance (nullptr for stub mode)
+     * Create RetroTINK controller with serial interface.
+     * @param serial Pointer to SerialInterface instance (nullptr for stub mode)
      */
-    explicit RetroTink(UsbHostSerial* usb = nullptr);
+    explicit RetroTink(SerialInterface* serial = nullptr);
     ~RetroTink();
 
     /**
      * Initialize the RetroTINK controller.
-     * Logs USB Host or stub mode status.
+     * Logs serial or stub mode status.
      */
     void begin();
 
     /**
-     * Process USB serial data and pending commands.
+     * Process serial data and pending commands.
      * Must be called in loop(). Handles:
      * - Reading and parsing incoming RT4K serial data
      * - Sending pending commands after boot completes
@@ -118,8 +118,8 @@ public:
     void sendRawCommand(const String& command);
 
     /**
-     * Check whether the RT4K USB device is connected.
-     * @return true if FTDI device is detected and ready
+     * Check whether the RT4K serial connection is active.
+     * @return true if serial interface is connected and ready
      */
     bool isConnected() const;
 
@@ -142,7 +142,7 @@ public:
     String getLastCommand() const { return _lastCommand; }
 
 private:
-    UsbHostSerial* _usb;
+    SerialInterface* _serial;
     std::vector<TriggerMapping> _triggers;
     String _lastCommand;
 
@@ -177,9 +177,9 @@ private:
     String generateCommand(const TriggerMapping& trigger) const;
 
     /**
-     * Send a framed command to the RetroTINK via USB.
+     * Send a framed command to the RetroTINK via serial.
      * Frames as "\r<command>\r" for proper RT4K parsing.
-     * Falls back to stub logging if USB is not available.
+     * Falls back to stub logging if serial is not available.
      * @param command The command to send
      */
     void sendCommand(const String& command);

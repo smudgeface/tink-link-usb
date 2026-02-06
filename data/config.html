@@ -85,6 +85,60 @@
         </div>
 
         <div class="card">
+            <h2>AVR Receiver</h2>
+            <p style="margin-bottom: 15px; font-size: 0.9em; color: #888;">
+                Configure automatic AVR power-on and input switching when the video switcher input changes.
+            </p>
+
+            <div class="message info" style="margin-bottom: 15px;">
+                <strong>Note:</strong> The AVR must have "Network Control" set to "Always On" in its network settings menu.
+            </div>
+
+            <form id="avr-form" onsubmit="return saveAvrConfig(event)">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 15px;">
+                    <div class="input-group">
+                        <label>
+                            <input type="checkbox" id="avr-enabled"> Enable AVR Control
+                        </label>
+                    </div>
+                    <div class="input-group">
+                        <label for="avr-ip">AVR IP Address</label>
+                        <div style="display: flex; gap: 8px; align-items: start;">
+                            <input type="text" id="avr-ip" placeholder="192.168.1.100" style="flex: 1;">
+                            <button type="button" class="secondary" id="avr-discover-btn" onclick="discoverAvr()" style="white-space: nowrap; padding: 8px 12px;">Discover</button>
+                        </div>
+                        <select id="avr-discovered" style="display: none; margin-top: 8px;" onchange="selectDiscoveredAvr()">
+                            <option value="">-- Select AVR --</option>
+                        </select>
+                        <div id="avr-discover-status" style="display: none; margin-top: 6px; font-size: 0.85em; color: #888;"></div>
+                    </div>
+                    <div class="input-group">
+                        <label for="avr-input">Input Source</label>
+                        <select id="avr-input">
+                            <option value="GAME">GAME</option>
+                            <option value="SAT/CBL">SAT/CBL</option>
+                            <option value="DVD">DVD</option>
+                            <option value="BD">BD</option>
+                            <option value="MPLAY">MPLAY</option>
+                            <option value="AUX2">AUX2</option>
+                            <option value="TV">TV</option>
+                            <option value="AUX1">AUX1</option>
+                            <option value="CD">CD</option>
+                            <option value="TUNER">TUNER</option>
+                            <option value="PHONO">PHONO</option>
+                            <option value="NET">NET</option>
+                            <option value="BT">BT</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="submit">Save AVR Config</button>
+                    <button type="button" class="secondary" onclick="testAvrConnection()">Test Connection</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
             <h2>Input Triggers</h2>
             <p style="margin-bottom: 15px; font-size: 0.9em; color: #888;">
                 Configure automatic RetroTINK profile switching when switcher inputs change.
@@ -433,12 +487,168 @@
             });
         }
 
+        // AVR Configuration
+        function loadAvrConfig() {
+            fetch('/api/config/avr')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('avr-enabled').checked = data.enabled;
+                    document.getElementById('avr-ip').value = data.ip || '';
+                    document.getElementById('avr-input').value = data.input || 'GAME';
+                })
+                .catch(err => console.error('Failed to load AVR config:', err));
+        }
+
+        function saveAvrConfig(event) {
+            event.preventDefault();
+
+            const enabled = document.getElementById('avr-enabled').checked;
+            const ip = document.getElementById('avr-ip').value;
+            const input = document.getElementById('avr-input').value;
+
+            if (enabled && !ip) {
+                showMessage('Please enter the AVR IP address', 'error');
+                return false;
+            }
+
+            const formData = new FormData();
+            formData.append('enabled', enabled ? '1' : '0');
+            formData.append('ip', ip);
+            formData.append('input', input);
+
+            fetch('/api/config/avr', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage('Failed to save AVR config: ' + data.error, 'error');
+                } else {
+                    showMessage('AVR configuration saved', 'success');
+                }
+            })
+            .catch(err => {
+                showMessage('Failed to save AVR config', 'error');
+                console.error('Save failed:', err);
+            });
+
+            return false;
+        }
+
+        function testAvrConnection() {
+            const ip = document.getElementById('avr-ip').value;
+            if (!ip) {
+                showMessage('Please enter an IP address first', 'error');
+                return;
+            }
+
+            // Save config first to ensure IP is set
+            const formData = new FormData();
+            formData.append('enabled', '1');
+            formData.append('ip', ip);
+            formData.append('input', document.getElementById('avr-input').value);
+
+            fetch('/api/config/avr', { method: 'POST', body: formData })
+            .then(() => {
+                // Now send test command
+                const cmdData = new FormData();
+                cmdData.append('command', 'PW?');
+                return fetch('/api/avr/send', { method: 'POST', body: cmdData });
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage('AVR test failed: ' + data.error, 'error');
+                } else {
+                    showMessage('AVR test command sent (PW?). Check debug console for response.', 'success');
+                }
+            })
+            .catch(err => {
+                showMessage('AVR test failed: ' + err, 'error');
+            });
+        }
+
+        // AVR SSDP Discovery
+        let discoverTimer = null;
+        let discoverTimeout = null;
+
+        function discoverAvr() {
+            const btn = document.getElementById('avr-discover-btn');
+            const select = document.getElementById('avr-discovered');
+            const status = document.getElementById('avr-discover-status');
+
+            btn.disabled = true;
+            btn.textContent = 'Discovering...';
+            select.style.display = 'none';
+            select.innerHTML = '<option value="">-- Select AVR --</option>';
+            status.style.display = 'block';
+            status.textContent = 'Searching for Denon/Marantz AVR receivers...';
+
+            function pollDiscover() {
+                fetch('/api/avr/discover')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'complete') {
+                            stopDiscovery();
+                            if (data.devices && data.devices.length > 0) {
+                                data.devices.forEach(d => {
+                                    const opt = document.createElement('option');
+                                    opt.value = d.ip;
+                                    opt.textContent = d.name + ' (' + d.ip + ')';
+                                    select.appendChild(opt);
+                                });
+                                select.style.display = 'block';
+                                status.textContent = 'Found ' + data.devices.length + ' AVR(s). Select one below.';
+                            } else {
+                                status.textContent = 'No AVR receivers found on the network.';
+                            }
+                        }
+                    })
+                    .catch(err => {
+                        stopDiscovery();
+                        status.textContent = 'Discovery failed: ' + err;
+                    });
+            }
+
+            function stopDiscovery() {
+                if (discoverTimer) { clearInterval(discoverTimer); discoverTimer = null; }
+                if (discoverTimeout) { clearTimeout(discoverTimeout); discoverTimeout = null; }
+                btn.disabled = false;
+                btn.textContent = 'Discover';
+            }
+
+            // Poll every 1 second
+            discoverTimer = setInterval(pollDiscover, 1000);
+
+            // Safety timeout after 5 seconds
+            discoverTimeout = setTimeout(() => {
+                if (discoverTimer) {
+                    // Do one final poll
+                    pollDiscover();
+                }
+            }, 5000);
+
+            // Trigger initial request
+            pollDiscover();
+        }
+
+        function selectDiscoveredAvr() {
+            const select = document.getElementById('avr-discovered');
+            if (select.value) {
+                document.getElementById('avr-ip').value = select.value;
+            }
+        }
+
         // Update status on load and periodically
         updateStatus();
         setInterval(updateStatus, 3000);
 
         // Load triggers on page load
         loadTriggers();
+
+        // Load AVR config on page load
+        loadAvrConfig();
     </script>
 </body>
 </html>

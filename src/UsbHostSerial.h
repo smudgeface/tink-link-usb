@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <EspUsbHostSerial_FTDI.h>
 #include <functional>
+#include "SerialInterface.h"
 
 /**
  * Ring buffer size for incoming USB serial data.
@@ -35,7 +36,7 @@ static const size_t USB_RX_BUFFER_SIZE = 512;
  *       size_t n = usb.read(buf, sizeof(buf));
  *   }
  */
-class UsbHostSerial : public EspUsbHostSerial_FTDI {
+class UsbHostSerial : public EspUsbHostSerial_FTDI, public SerialInterface {
 public:
     using ConnectCallback = std::function<void()>;
 
@@ -52,7 +53,7 @@ public:
      * Process USB Host events. Must be called in loop().
      * Delegates to EspUsbHostSerial_FTDI::task().
      */
-    void update();
+    void update() override;
 
     /**
      * Send data to the connected FTDI device.
@@ -60,7 +61,7 @@ public:
      * @param data The data string to send
      * @return true if data was submitted, false if device not connected or data too large
      */
-    bool sendData(const String& data);
+    bool sendData(const String& data) override;
 
     /**
      * Send raw bytes to the connected FTDI device.
@@ -75,6 +76,12 @@ public:
      * @return true if device is ready for communication
      */
     bool isDeviceConnected() const { return _connected; }
+
+    /**
+     * SerialInterface: Check if transport connection is active.
+     * @return true if FTDI device is connected
+     */
+    bool isConnected() const override { return _connected; }
 
     /**
      * Get the manufacturer string from the connected device.
@@ -92,7 +99,7 @@ public:
      * Get the number of bytes available to read from the receive buffer.
      * @return Number of bytes available
      */
-    size_t available() const;
+    size_t available() const override;
 
     /**
      * Read data from the receive buffer.
@@ -107,7 +114,7 @@ public:
      * @param line Output string (without the terminator)
      * @return true if a complete line was read, false if no complete line available
      */
-    bool readLine(String& line);
+    bool readLine(String& line) override;
 
     /**
      * Set callback for device connection events.

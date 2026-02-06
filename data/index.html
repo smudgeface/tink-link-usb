@@ -66,6 +66,26 @@
         </div>
 
         <div class="card">
+            <h2>AVR Receiver</h2>
+            <div class="status-item">
+                <span class="status-label">Status</span>
+                <span class="status-value" id="avr-status">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">IP Address</span>
+                <span class="status-value" id="avr-ip">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Input Source</span>
+                <span class="status-value" id="avr-input">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Last Command</span>
+                <span class="status-value" id="avr-command">--</span>
+            </div>
+        </div>
+
+        <div class="card">
             <h2>Triggers</h2>
             <div class="trigger-list" id="trigger-list">
                 <div class="loading">Loading...</div>
@@ -98,6 +118,24 @@
                     document.getElementById('tink-connected').textContent = data.tink.connected ? 'Connected' : 'Disconnected';
                     document.getElementById('tink-power').textContent = data.tink.powerState || '--';
                     document.getElementById('tink-command').textContent = data.tink.lastCommand || '--';
+
+                    // AVR status
+                    if (data.avr) {
+                        const avrStatus = document.getElementById('avr-status');
+                        if (!data.avr.enabled) {
+                            avrStatus.textContent = 'Disabled';
+                            avrStatus.className = 'status-value';
+                        } else if (data.avr.connected) {
+                            avrStatus.textContent = 'Connected';
+                            avrStatus.className = 'status-value connected';
+                        } else {
+                            avrStatus.textContent = 'Enabled (idle)';
+                            avrStatus.className = 'status-value';
+                        }
+                        document.getElementById('avr-ip').textContent = data.avr.ip || '--';
+                        document.getElementById('avr-input').textContent = data.avr.input || '--';
+                        document.getElementById('avr-command').textContent = data.avr.lastCommand || '--';
+                    }
 
                     // Triggers
                     const triggerList = document.getElementById('trigger-list');

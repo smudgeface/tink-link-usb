@@ -3,6 +3,7 @@
 #include "ConfigManager.h"
 #include "ExtronSwVga.h"
 #include "RetroTink.h"
+#include "DenonAvr.h"
 #include "Logger.h"
 #include "version.h"
 #include <ArduinoJson.h>
@@ -15,6 +16,7 @@ WebServer::WebServer(uint16_t port)
     , _config(nullptr)
     , _extron(nullptr)
     , _tink(nullptr)
+    , _avr(nullptr)
     , _otaMode(OTAMode::FIRMWARE)
     , _otaProgress(0)
     , _otaTotal(0)
@@ -27,11 +29,12 @@ WebServer::~WebServer() {
     delete _server;
 }
 
-void WebServer::begin(WifiManager* wifi, ConfigManager* config, ExtronSwVga* extron, RetroTink* tink) {
+void WebServer::begin(WifiManager* wifi, ConfigManager* config, ExtronSwVga* extron, RetroTink* tink, DenonAvr* avr) {
     _wifi = wifi;
     _config = config;
     _extron = extron;
     _tink = tink;
+    _avr = avr;
 
     setupRoutes();
     _server->begin();
@@ -83,6 +86,19 @@ void WebServer::setupRoutes() {
 
     _server->on("/api/switcher/receive", HTTP_GET,
         [this](AsyncWebServerRequest* request) { handleApiSwitcherReceive(request); });
+
+    // AVR endpoints
+    _server->on("/api/avr/discover", HTTP_GET,
+        [this](AsyncWebServerRequest* request) { handleApiAvrDiscover(request); });
+
+    _server->on("/api/avr/send", HTTP_POST,
+        [this](AsyncWebServerRequest* request) { handleApiAvrSend(request); });
+
+    _server->on("/api/config/avr", HTTP_GET,
+        [this](AsyncWebServerRequest* request) { handleApiConfigAvrGet(request); });
+
+    _server->on("/api/config/avr", HTTP_POST,
+        [this](AsyncWebServerRequest* request) { handleApiConfigAvr(request); });
 
     // System logs endpoint
     _server->on("/api/logs", HTTP_GET,
@@ -162,6 +178,18 @@ void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
     doc["tink"]["connected"] = _tink->isConnected();
     doc["tink"]["powerState"] = _tink->getPowerStateString();
     doc["tink"]["lastCommand"] = _tink->getLastCommand();
+
+    // AVR status
+    if (_avr) {
+        auto avrConfig = _config->getAvrConfig();
+        doc["avr"]["type"] = avrConfig.type;
+        doc["avr"]["enabled"] = _avr->isEnabled();
+        doc["avr"]["connected"] = _avr->isConnected();
+        doc["avr"]["ip"] = avrConfig.ip;
+        doc["avr"]["input"] = _avr->getInput();
+        doc["avr"]["lastCommand"] = _avr->getLastCommand();
+        doc["avr"]["lastResponse"] = _avr->getLastResponse();
+    }
 
     // Triggers
     JsonArray triggersArray = doc["triggers"].to<JsonArray>();
@@ -611,6 +639,119 @@ void WebServer::handleOtaUpload(AsyncWebServerRequest* request, String filename,
             LOG_INFO("OTA: Update successful! Total: %u bytes", _otaProgress);
         }
         _otaInProgress = false;
+    }
+}
+
+void WebServer::handleApiAvrSend(AsyncWebServerRequest* request) {
+    if (!_avr) {
+        request->send(500, "application/json", "{\"error\":\"AVR not configured\"}");
+        return;
+    }
+
+    String command;
+    if (request->hasParam("command", true)) {
+        command = request->getParam("command", true)->value();
+    }
+
+    if (command.length() == 0) {
+        request->send(400, "application/json", "{\"error\":\"Command required\"}");
+        return;
+    }
+
+    if (!_avr->isEnabled()) {
+        request->send(400, "application/json", "{\"error\":\"AVR control is disabled\"}");
+        return;
+    }
+
+    LOG_DEBUG("WebServer: AVR command: %s", command.c_str());
+
+    bool sent = _avr->sendRawCommand(command);
+
+    JsonDocument doc;
+    doc["status"] = sent ? "ok" : "error";
+    doc["command"] = command;
+    if (!sent) {
+        doc["error"] = "Failed to send command";
+    }
+
+    String response;
+    serializeJson(doc, response);
+    request->send(sent ? 200 : 500, "application/json", response);
+}
+
+void WebServer::handleApiAvrDiscover(AsyncWebServerRequest* request) {
+    if (!_avr) {
+        request->send(500, "application/json", "{\"error\":\"AVR not configured\"}");
+        return;
+    }
+
+    JsonDocument doc;
+
+    if (_avr->isDiscoveryComplete()) {
+        auto devices = _avr->getDiscoveryResults();
+
+        doc["status"] = "complete";
+        JsonArray devicesArray = doc["devices"].to<JsonArray>();
+
+        for (const auto& dev : devices) {
+            JsonObject devObj = devicesArray.add<JsonObject>();
+            devObj["ip"] = dev.ip;
+            devObj["name"] = dev.friendlyName;
+        }
+
+        // Start a new scan for the next poll
+        _avr->startDiscovery();
+    } else {
+        _avr->startDiscovery(); // Start if not already running
+        doc["status"] = "discovering";
+        doc["devices"] = JsonArray();
+    }
+
+    String response;
+    serializeJson(doc, response);
+    request->send(200, "application/json", response);
+}
+
+void WebServer::handleApiConfigAvrGet(AsyncWebServerRequest* request) {
+    auto avrConfig = _config->getAvrConfig();
+
+    JsonDocument doc;
+    doc["type"] = avrConfig.type;
+    doc["enabled"] = avrConfig.enabled;
+    doc["ip"] = avrConfig.ip;
+    doc["input"] = avrConfig.input;
+
+    String response;
+    serializeJson(doc, response);
+    request->send(200, "application/json", response);
+}
+
+void WebServer::handleApiConfigAvr(AsyncWebServerRequest* request) {
+    auto avrConfig = _config->getAvrConfig();
+
+    if (request->hasParam("enabled", true)) {
+        String val = request->getParam("enabled", true)->value();
+        avrConfig.enabled = (val == "true" || val == "1");
+    }
+    if (request->hasParam("ip", true)) {
+        avrConfig.ip = request->getParam("ip", true)->value();
+    }
+    if (request->hasParam("input", true)) {
+        avrConfig.input = request->getParam("input", true)->value();
+    }
+
+    _config->setAvrConfig(avrConfig);
+    if (_config->saveConfig()) {
+        // Reconfigure live instance
+        if (_avr) {
+            _avr->configure(avrConfig.ip, avrConfig.input, avrConfig.enabled);
+        }
+
+        request->send(200, "application/json", "{\"status\":\"ok\"}");
+        LOG_INFO("WebServer: AVR config saved (enabled: %s, ip: %s, input: %s)",
+                 avrConfig.enabled ? "yes" : "no", avrConfig.ip.c_str(), avrConfig.input.c_str());
+    } else {
+        request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
     }
 }
 

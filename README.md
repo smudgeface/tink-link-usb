@@ -1,10 +1,8 @@
 # TinkLink-USB
 
-> **Status**: Phase 3 Complete - USB Host communication with RetroTINK 4K working. WiFi, LED, Web Console, OTA Updates all functional.
+> **Current Version**: 1.8.0
 
 A USB-based ESP32-S3 bridge between video switchers and the RetroTINK 4K.
-
-📋 **[Implementation Plan](implementation-plan.md)** - Detailed development roadmap and current status
 
 TinkLink-USB automatically triggers RetroTINK 4K profile changes when your video switcher changes inputs. This version uses **USB Host** to communicate directly with the RetroTINK 4K over its USB serial interface, eliminating the need for VGA cable serial connections and level shifters.
 
@@ -29,10 +27,12 @@ The original [TinkLink](https://github.com/Patrick-Working/tink-link) project us
 - **RT4K Power State Tracking** - Detects boot complete and power-off events via serial, auto-wakes RT4K when input changes arrive while sleeping
 - **Signal Detection Auto-Switch** - Parses Extron signal detection messages (`Sig`) to automatically switch inputs when a video source is powered on, with 2-second debounce to filter glitches
 - **SVS & Remote Commands** - Supports both SVS (Scalable Video Switch) and Remote profile loading modes with automatic keep-alive
+- **Denon/Marantz AVR Control** - Automatic power-on and input switching via telnet (TCP port 23) when video switcher input changes
+- **AVR Network Discovery** - SSDP (UPnP) multicast discovery finds Denon/Marantz AVRs on the local network with model identification
 - **Video Switcher Support** - Monitors Extron SW series VGA switchers via RS-232 (modular design supports future switcher types)
-- **Web Interface** - Monitor status, configure WiFi, and manage input triggers from any browser
+- **Web Interface** - Monitor status, configure WiFi, manage input triggers, and configure AVR settings from any browser
 - **Trigger Configuration** - Web-based interface to create and edit switcher input to RetroTINK profile mappings
-- **System Console** - Web-based debug console with live log streaming and command sending to switcher or RetroTINK
+- **System Console** - Web-based debug console with live log streaming and command sending to switcher, RetroTINK, or AVR
 - **OTA Updates** - Update firmware and filesystem over WiFi (no USB required)
 - **Centralized Logging** - Debug logs with timestamps accessible via web interface and `scripts/logs.py`
 - **mDNS Support** - Access via `http://tinklink.local`
@@ -196,12 +196,14 @@ SVS NEW INPUT=2\r\n    # Switch to input 2 and load S2_*.rt4 profile
    <img src="assets/hardware/db9-to-3.5mm-adapter.jpg" width="400" alt="DB9 to 3.5mm Stereo Adapter">
 
 5. **USB OTG Cable** - For connecting ESP32-S3 to RetroTINK 4K
+   - [MOGOOD 60W PD USB OTG adapter](https://www.amazon.ca/dp/B0B5MPCJF5)
+   - Also requires a USB A to USB C adapter cable to connect the TinkLink-USB to the USB A port
 
 6. **2.4GHz WiFi network** - For web interface access
 
 ### Installation
 
-**Current Status - Phase 3 Complete**: USB Host communication with RetroTINK 4K working. Device runs in USB OTG mode.
+The device runs in USB OTG mode for USB Host communication with the RetroTINK 4K.
 
 #### Step 1: Clone the Repository
 
@@ -296,7 +298,7 @@ For convenience, here's the complete sequence to build and flash everything:
 pio run -e esp32s3 -t upload && pio run -e esp32s3 -t uploadfs
 ```
 
-**Note**: The firmware runs in USB OTG mode. After the first USB upload, subsequent updates should use OTA. See [implementation-plan.md](implementation-plan.md) for development history.
+**Note**: The firmware runs in USB OTG mode. After the first USB upload, subsequent updates should use OTA.
 
 ### OTA (Over-The-Air) Updates
 
@@ -372,6 +374,11 @@ The web interface provides comprehensive configuration and monitoring capabiliti
 
 **Config Page** (`/config.html`)
 - WiFi network scanning and connection management
+- AVR receiver configuration:
+  - Enable/disable Denon/Marantz AVR control
+  - SSDP network discovery to find AVRs automatically
+  - Configure IP address and input source
+  - Test connection
 - Trigger configuration:
   - View all switcher input to RetroTINK profile mappings
   - Add new triggers (input, profile, mode, name)
@@ -453,9 +460,10 @@ tink-link-usb/
 ├── LICENSE
 ├── README.md
 ├── CLAUDE.md                  # AI assistant development guide
-├── implementation-plan.md
 ├── platformio.ini
 ├── assets/
+│   ├── docs/                  # Reference documentation
+│   │   └── HEOS_CLI_Protocol_Specification.pdf
 │   └── hardware/              # Hardware documentation and images
 │       ├── esp32-s3-zero.jpg          # ESP32-S3-Zero product photo
 │       ├── ESP32-S3-Zero-2D-size.jpg  # Board dimensions (2D drawing)
@@ -474,10 +482,15 @@ tink-link-usb/
 │   ├── Logger.cpp
 │   ├── UsbHostSerial.h        # USB Host FTDI serial driver
 │   ├── UsbHostSerial.cpp
+│   ├── SerialInterface.h      # Abstract serial interface
+│   ├── TelnetSerial.h         # TCP telnet serial transport
+│   ├── TelnetSerial.cpp
 │   ├── ExtronSwVga.h          # Extron switcher UART handler
 │   ├── ExtronSwVga.cpp
 │   ├── RetroTink.h            # RetroTINK 4K controller (USB Host)
 │   ├── RetroTink.cpp
+│   ├── DenonAvr.h             # Denon/Marantz AVR controller (telnet + SSDP)
+│   ├── DenonAvr.cpp
 │   ├── WifiManager.h          # WiFi STA/AP management
 │   ├── WifiManager.cpp
 │   ├── WebServer.h            # Async web server and API
@@ -494,10 +507,42 @@ tink-link-usb/
     └── wifi.json              # WiFi credentials template
 ```
 
+## Changelog
+
+### v1.8.0 — AVR Network Discovery
+
+- **SSDP Discovery** — "Discover" button on config page finds Denon/Marantz AVRs on the local network via UPnP multicast, fetches friendly names from device XML descriptions
+- **New API endpoint** — `GET /api/avr/discover` with polling pattern (matches WiFi scan UX)
+- **Reference docs** — Added [HEOS CLI Protocol Specification](assets/docs/HEOS_CLI_Protocol_Specification.pdf) to `assets/docs/`
+
+### v1.7.0 — Denon/Marantz AVR Control
+
+- **AVR telnet control** — Sends power-on (`PWON`) and input select (`SI<input>`) commands via TCP port 23 when video switcher input changes
+- **Modular serial transport** — `SerialInterface` abstraction with `TelnetSerial` implementation for TCP-based serial communication
+- **AVR configuration UI** — Config page section for enabling AVR control, setting IP address, selecting input source, and testing the connection
+- **AVR status API** — `GET /api/config/avr`, `POST /api/config/avr`, `POST /api/avr/send` endpoints
+- **Denon protocol** — ASCII commands terminated with CR; supports power, input, and volume queries
+
+### v1.6.0 — Signal Detection Auto-Switch
+
+- **Extron signal parsing** — Parses `Sig` messages from Extron switcher to detect video source power-on/off events
+- **Auto-switch with debounce** — 2-second debounce filters signal glitches; highest active input wins
+- **Signal restore handling** — Re-triggers input callback when signal returns on current input (enables RT4K auto-wake after power cycle)
+
+### v1.5.0 — USB Host Communication
+
+- **USB Host FTDI driver** — `UsbHostSerial` class communicates with RetroTINK 4K via FTDI FT232R at 115200 baud
+- **RT4K power state tracking** — Detects boot complete, power-off, and sleep events via serial
+- **Auto-wake** — Automatically powers on RT4K and queues commands when input changes arrive while sleeping
+- **SVS keep-alive** — Sends follow-up `SVS CURRENT` command after `SVS NEW` to maintain connection
+- **USB OTG mode** — Switched from CDC to OTG mode; all debugging via web console and `scripts/logs.py`
+
 ## Reference Projects
 
 - **[ClownCar](https://github.com/svirant/ClownCar)** - Arduino Nano ESP32 project that uses USB Host to communicate with RetroTINK 4K
 - **[EspUsbHost](https://github.com/wakwak-koba/EspUsbHost)** - ESP32-S3 USB Host library supporting FTDI serial devices
+- **[HEOS CLI Protocol Specification](assets/docs/HEOS_CLI_Protocol_Specification.pdf)** - Denon/Marantz network protocol (SSDP discovery, telnet control)
+- **[Denon AVR Network Ports](https://manuals.denon.com/EUsecurity/EU/EN/index.php)** - Required firewall ports for AVR network control
 
 ## License
 

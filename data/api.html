@@ -150,6 +150,7 @@
                 <a href="#wifi">WiFi</a>
                 <a href="#config">Config</a>
                 <a href="#tink">RetroTINK</a>
+                <a href="#avr">AVR</a>
                 <a href="#switcher">Switcher</a>
                 <a href="#debug">Debug</a>
                 <a href="#logs">Logs</a>
@@ -171,7 +172,7 @@
                 <div class="api-section">
                     <h4>Response</h4>
                     <div class="api-example">{
-  "version": "1.5.0",
+  "version": "1.8.0",
   "wifi": {
     "connected": true,
     "ssid": "MyNetwork",
@@ -188,6 +189,15 @@
     "connected": true,
     "powerState": "on",
     "lastCommand": "SVS NEW INPUT=1"
+  },
+  "avr": {
+    "type": "Denon X4300H",
+    "enabled": true,
+    "connected": false,
+    "ip": "192.168.1.100",
+    "input": "GAME",
+    "lastCommand": "SIGAME",
+    "lastResponse": "SIGAME"
   },
   "triggers": [
     { "input": 1, "profile": 1, "mode": "SVS", "name": "NES" }
@@ -344,6 +354,114 @@
   "status": "ok",
   "command": "remote prof1"
 }</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AVR APIs -->
+        <div class="card" id="avr">
+            <h2>AVR</h2>
+
+            <div class="api-endpoint">
+                <span class="api-method get">GET</span>
+                <span class="api-path">/api/config/avr</span>
+                <button class="secondary try-btn" onclick="tryApi('GET', '/api/config/avr')">Try</button>
+                <p class="api-desc">Get current AVR configuration.</p>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "type": "Denon X4300H",
+  "enabled": true,
+  "ip": "192.168.1.100",
+  "input": "GAME"
+}</div>
+                </div>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method get">GET</span>
+                <span class="api-path">/api/avr/discover</span>
+                <button class="secondary try-btn" onclick="tryApi('GET', '/api/avr/discover')">Try</button>
+                <p class="api-desc">Discover Denon/Marantz AVR receivers on the local network via SSDP (UPnP multicast on port 1900). First call starts discovery, subsequent calls return results when ready.</p>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "status": "complete",
+  "devices": [
+    { "ip": "192.168.1.100", "name": "Denon AVR-X4300H" }
+  ]
+}
+
+// status: "discovering" while scan is in progress
+// status: "complete" when results are ready</div>
+                </div>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method post">POST</span>
+                <span class="api-path">/api/config/avr</span>
+                <p class="api-desc">Update AVR configuration. Saves to flash and reconfigures the live instance.</p>
+                <div class="api-section">
+                    <h4>Parameters</h4>
+                    <table class="param-table">
+                        <tr><th>Name</th><th>Type</th><th>Description</th></tr>
+                        <tr>
+                            <td><span class="param-name">enabled</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>"1" or "true" to enable, "0" or "false" to disable</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">ip</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>AVR IP address (e.g., "192.168.1.100")</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">input</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>Denon input source (e.g., "GAME", "SAT/CBL", "DVD")</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{ "status": "ok" }</div>
+                </div>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method post">POST</span>
+                <span class="api-path">/api/avr/send</span>
+                <p class="api-desc">Send a raw command to the Denon AVR via TCP telnet (port 23). CR terminator is added automatically.</p>
+                <div class="api-section">
+                    <h4>Parameters</h4>
+                    <table class="param-table">
+                        <tr><th>Name</th><th>Type</th><th>Description</th></tr>
+                        <tr>
+                            <td><span class="param-name">command</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>Denon protocol command (e.g., "PWON", "SIGAME", "PW?", "SI?")<span class="param-required">required</span></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "status": "ok",
+  "command": "PWON"
+}</div>
+                </div>
+                <div class="api-section">
+                    <h4>Common Denon Commands</h4>
+                    <table class="param-table">
+                        <tr><th>Command</th><th>Description</th></tr>
+                        <tr><td><span class="param-name">PWON</span></td><td>Power on</td></tr>
+                        <tr><td><span class="param-name">PWSTANDBY</span></td><td>Power standby</td></tr>
+                        <tr><td><span class="param-name">PW?</span></td><td>Query power state</td></tr>
+                        <tr><td><span class="param-name">SI<i>input</i></span></td><td>Select input (e.g., SIGAME, SISAT/CBL)</td></tr>
+                        <tr><td><span class="param-name">SI?</span></td><td>Query current input</td></tr>
+                        <tr><td><span class="param-name">MV<i>nn</i></span></td><td>Set volume (e.g., MV50)</td></tr>
+                        <tr><td><span class="param-name">MV?</span></td><td>Query volume</td></tr>
+                    </table>
                 </div>
             </div>
         </div>
@@ -587,6 +705,23 @@
                 <h4>Send Switcher Command</h4>
                 <div class="api-example">curl -X POST http://tinklink.local/api/switcher/send \
      -d "message=1!"</div>
+            </div>
+
+            <div class="api-section">
+                <h4>Discover AVR Receivers</h4>
+                <div class="api-example">curl http://tinklink.local/api/avr/discover</div>
+            </div>
+
+            <div class="api-section">
+                <h4>Configure AVR</h4>
+                <div class="api-example">curl -X POST http://tinklink.local/api/config/avr \
+     -d "enabled=1&ip=192.168.1.100&input=GAME"</div>
+            </div>
+
+            <div class="api-section">
+                <h4>Send AVR Command</h4>
+                <div class="api-example">curl -X POST http://tinklink.local/api/avr/send \
+     -d "command=PW?"</div>
             </div>
 
             <div class="api-section">

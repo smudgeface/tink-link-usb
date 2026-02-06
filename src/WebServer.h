@@ -9,6 +9,7 @@ class WifiManager;
 class ConfigManager;
 class ExtronSwVga;
 class RetroTink;
+class DenonAvr;
 
 /**
  * LED control callback function type.
@@ -64,8 +65,9 @@ public:
      * @param config Configuration manager for settings
      * @param extron Extron handler for UART operations
      * @param tink RetroTINK controller for commands
+     * @param avr Denon AVR controller (nullptr if not used)
      */
-    void begin(WifiManager* wifi, ConfigManager* config, ExtronSwVga* extron, RetroTink* tink);
+    void begin(WifiManager* wifi, ConfigManager* config, ExtronSwVga* extron, RetroTink* tink, DenonAvr* avr = nullptr);
 
     /** Stop the web server. */
     void end();
@@ -82,6 +84,7 @@ private:
     ConfigManager* _config;
     ExtronSwVga* _extron;
     RetroTink* _tink;
+    DenonAvr* _avr;
     LEDControlCallback _ledCallback;
 
     // OTA state
@@ -107,6 +110,10 @@ private:
     void handleApiSwitcherReceive(AsyncWebServerRequest* request);
     void handleApiLogs(AsyncWebServerRequest* request);
     void handleApiOtaStatus(AsyncWebServerRequest* request);
+    void handleApiAvrSend(AsyncWebServerRequest* request);
+    void handleApiAvrDiscover(AsyncWebServerRequest* request);
+    void handleApiConfigAvr(AsyncWebServerRequest* request);
+    void handleApiConfigAvrGet(AsyncWebServerRequest* request);
     void handleNotFound(AsyncWebServerRequest* request);
 
     /**

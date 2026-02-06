@@ -6,7 +6,7 @@ This document provides guidelines and conventions for Claude (AI assistant) when
 
 TinkLink-USB is an ESP32-S3 USB bridge between video switchers and the RetroTINK 4K. It automatically triggers RetroTINK profile changes when video switcher inputs change.
 
-**Current Status:** Phase 3 Complete - USB Host communication with RetroTINK 4K working. WiFi, LED, Web Console, OTA all functional. Version 1.5.0.
+**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, and SSDP discovery all functional. Version 1.8.0.
 
 **Tech Stack:**
 - Platform: ESP32-S3 (Arduino framework, USB OTG mode)
@@ -155,6 +155,8 @@ APIs are organized by resource:
 /api/wifi/*              - WiFi operations
 /api/tink/*              - RetroTINK operations
 /api/switcher/*          - Video switcher operations
+/api/avr/*               - Denon/Marantz AVR operations
+/api/config/avr          - AVR configuration
 /api/debug/*             - Debug utilities
 /api/logs                - System logs
 /api/ota/*               - OTA updates
@@ -344,8 +346,11 @@ tink-link-usb/
 │   ├── WifiManager.*  # WiFi connection management
 │   ├── ConfigManager.* # Configuration persistence
 │   ├── UsbHostSerial.* # USB Host FTDI serial driver
+│   ├── SerialInterface.h # Abstract serial interface
+│   ├── TelnetSerial.* # TCP telnet serial transport
 │   ├── ExtronSwVga.*  # Video switcher protocol handler
 │   ├── RetroTink.*    # RetroTINK 4K controller (USB Host)
+│   ├── DenonAvr.*     # Denon/Marantz AVR controller (telnet + SSDP)
 │   ├── Logger.*       # Centralized logging
 │   └── version.h      # Version definitions
 ├── scripts/           # Helper scripts
@@ -353,7 +358,6 @@ tink-link-usb/
 │   └── logs.py        # Remote log viewer
 ├── platformio.ini     # PlatformIO configuration
 ├── README.md          # User documentation
-├── implementation-plan.md # Development roadmap
 └── CLAUDE.md          # This file (AI assistant guide)
 ```
 
@@ -382,10 +386,11 @@ tink-link-usb/
 ## References
 
 - **User Documentation**: README.md
-- **Development Plan**: implementation-plan.md
 - **API Reference**: http://tinklink.local/api.html (when device is running)
 - **Repository**: https://github.com/smudgeface/tink-link-usb
+- **HEOS CLI Protocol Specification**: assets/docs/HEOS_CLI_Protocol_Specification.pdf
+- **Denon AVR Network Ports**: https://manuals.denon.com/EUsecurity/EU/EN/index.php
 
 ---
 
-**Last Updated**: 2025 (v1.5.0)
+**Last Updated**: 2026 (v1.8.0)

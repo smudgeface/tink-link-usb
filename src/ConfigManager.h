@@ -44,6 +44,16 @@ public:
     };
 
     /**
+     * AVR receiver configuration.
+     */
+    struct AvrConfig {
+        String type;      ///< AVR type (e.g., "Denon X4300H")
+        bool enabled;     ///< Whether AVR control is active
+        String ip;        ///< AVR IP address
+        String input;     ///< Input source (e.g., "GAME", "SAT/CBL")
+    };
+
+    /**
      * Hardware pin configuration.
      */
     struct HardwareConfig {
@@ -92,6 +102,9 @@ public:
     /** @return Current hardware pin configuration */
     const HardwareConfig& getHardwareConfig() const { return _hardwareConfig; }
 
+    /** @return Current AVR configuration */
+    const AvrConfig& getAvrConfig() const { return _avrConfig; }
+
     /** @return List of configured switcher input to RetroTINK profile triggers */
     const std::vector<TriggerMapping>& getTriggers() const { return _triggers; }
 
@@ -115,6 +128,12 @@ public:
     void setTriggers(const std::vector<TriggerMapping>& triggers);
 
     /**
+     * Set AVR configuration (not saved until saveConfig() called).
+     * @param config AVR configuration
+     */
+    void setAvrConfig(const AvrConfig& config);
+
+    /**
      * Check if WiFi credentials have been configured.
      * @return true if SSID is non-empty
      */
@@ -124,6 +143,7 @@ private:
     WifiConfig _wifiConfig;
     SwitcherConfig _switcherConfig;
     HardwareConfig _hardwareConfig;
+    AvrConfig _avrConfig;
     std::vector<TriggerMapping> _triggers;
 
     bool loadDefaultConfig();

@@ -39,6 +39,7 @@
                     <select id="console-target" style="background: #3e3e42; color: #d4d4d4; border: none; padding: 8px 4px 8px 8px; font-size: 0.8em; outline: none; cursor: pointer; width: 80px;">
                         <option value="extron">Switcher</option>
                         <option value="tink">Tink</option>
+                        <option value="avr">AVR</option>
                     </select>
                     <span style="color: #569cd6; font-family: 'Courier New', monospace; font-weight: bold; padding: 10px 8px 10px 8px;">&gt;</span>
                     <input type="text" id="console-input" placeholder="Enter command..."
@@ -60,6 +61,12 @@
                         <span style="font-size: 0.75em; color: #666;">RetroTINK:</span>
                         <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=1', 'tink')" style="font-size: 0.8em; padding: 4px 10px;">Profile 1</button>
                         <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=2', 'tink')" style="font-size: 0.8em; padding: 4px 10px;">Profile 2</button>
+                    </div>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <span style="font-size: 0.75em; color: #666;">AVR:</span>
+                        <button class="secondary" onclick="quickConsoleCommand('PWON', 'avr')" style="font-size: 0.8em; padding: 4px 10px;">Power On</button>
+                        <button class="secondary" onclick="quickConsoleCommand('PW?', 'avr')" style="font-size: 0.8em; padding: 4px 10px;">Status</button>
+                        <button class="secondary" onclick="quickConsoleCommand('SI?', 'avr')" style="font-size: 0.8em; padding: 4px 10px;">Input?</button>
                     </div>
                 </div>
                 <button type="button" class="secondary" onclick="clearConsole()" style="padding: 6px 12px; font-size: 0.8em;">Clear</button>
@@ -145,27 +152,6 @@
             </div>
         </div>
 
-        <div class="card">
-            <h2>Implementation Status</h2>
-            <p><strong>Current Phase: USB Host Communication (Phase 3)</strong></p>
-
-            <p><strong>Hardware Configuration:</strong></p>
-            <ul>
-                <li><strong>Extron Input:</strong> UART1 on TX:GPIO43, RX:GPIO44 @ 9600 baud</li>
-                <li><strong>RetroTINK Output:</strong> USB Host FTDI on GPIO19/20 @ 115200 baud</li>
-                <li><strong>Status LED:</strong> WS2812 RGB on GPIO21</li>
-            </ul>
-
-            <p><strong>Implementation Phases:</strong></p>
-            <ul>
-                <li>✅ Phase 1: Base framework & CDC mode</li>
-                <li>✅ Phase 2: WiFi & LED functionality</li>
-                <li>✅ Phase 3: USB Host FTDI serial for RetroTINK 4K</li>
-            </ul>
-
-            <p><strong>Note:</strong> USB is in OTG mode (no CDC serial). Use this web console
-            or <code>scripts/logs.py</code> for debugging.</p>
-        </div>
     </div>
 
     <script>
@@ -278,6 +264,10 @@
                 line.innerHTML = tsPrefix + '<span style="color: #4ec9b0;">[switcher] &lt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'rx-tink') {
                 line.innerHTML = tsPrefix + '<span style="color: #ce9178;">[tink] &lt; ' + escapeHtml(text) + '</span>';
+            } else if (type === 'tx-avr') {
+                line.innerHTML = '<span style="color: #dcdcaa;">[avr] &gt; ' + escapeHtml(text) + '</span>';
+            } else if (type === 'rx-avr') {
+                line.innerHTML = tsPrefix + '<span style="color: #b5cea8;">[avr] &lt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'rx') {
                 line.innerHTML = tsPrefix + '<span style="color: #4ec9b0;">&lt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'log-debug') {
@@ -329,6 +319,9 @@
 
             if (target === 'tink') {
                 apiUrl = '/api/tink/send';
+                bodyParam = 'command';
+            } else if (target === 'avr') {
+                apiUrl = '/api/avr/send';
                 bodyParam = 'command';
             }
 

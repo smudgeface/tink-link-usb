@@ -12,6 +12,12 @@ ConfigManager::ConfigManager() {
     // Hardware pins
     _hardwareConfig.ledPin = 21;  // WS2812 RGB LED
 
+    // AVR defaults
+    _avrConfig.type = "Denon X4300H";
+    _avrConfig.enabled = false;
+    _avrConfig.ip = "";
+    _avrConfig.input = "GAME";
+
     _wifiConfig.hostname = "tinklink";
 }
 
@@ -56,6 +62,14 @@ bool ConfigManager::loadConfig() {
     // Parse hardware config
     if (doc["hardware"].is<JsonObject>()) {
         _hardwareConfig.ledPin = doc["hardware"]["ledPin"] | 21;
+    }
+
+    // Parse AVR config
+    if (doc["avr"].is<JsonObject>()) {
+        _avrConfig.type = doc["avr"]["type"] | "Denon X4300H";
+        _avrConfig.enabled = doc["avr"]["enabled"] | false;
+        _avrConfig.ip = doc["avr"]["ip"] | "";
+        _avrConfig.input = doc["avr"]["input"] | "GAME";
     }
 
     // Parse hostname (from root or wirelessClient for backwards compatibility)
@@ -108,6 +122,12 @@ bool ConfigManager::saveConfig() {
 
     // Hardware config
     doc["hardware"]["ledPin"] = _hardwareConfig.ledPin;
+
+    // AVR config
+    doc["avr"]["type"] = _avrConfig.type;
+    doc["avr"]["enabled"] = _avrConfig.enabled;
+    doc["avr"]["ip"] = _avrConfig.ip;
+    doc["avr"]["input"] = _avrConfig.input;
 
     // Hostname
     doc["hostname"] = _wifiConfig.hostname;
@@ -194,6 +214,10 @@ void ConfigManager::setHostname(const String& hostname) {
 
 void ConfigManager::setTriggers(const std::vector<TriggerMapping>& triggers) {
     _triggers = triggers;
+}
+
+void ConfigManager::setAvrConfig(const AvrConfig& config) {
+    _avrConfig = config;
 }
 
 bool ConfigManager::hasWifiCredentials() const {

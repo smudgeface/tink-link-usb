@@ -4,6 +4,8 @@
 #include "ExtronSwVga.h"
 #include "UsbHostSerial.h"
 #include "RetroTink.h"
+#include "TelnetSerial.h"
+#include "DenonAvr.h"
 #include "WifiManager.h"
 #include "WebServer.h"
 #include "Logger.h"
@@ -23,6 +25,8 @@ ConfigManager configManager;
 UsbHostSerial usbHost;
 ExtronSwVga* extron = nullptr;
 RetroTink* tink = nullptr;
+TelnetSerial* avrSerial = nullptr;
+DenonAvr* avr = nullptr;
 WifiManager wifiManager;
 WebServer webServer;
 
@@ -89,7 +93,7 @@ void setup() {
     LOG_RAW("\n");
 
     // Initialize configuration manager (LittleFS) - load before hardware init
-    LOG_INFO("[1/6] Initializing configuration...");
+    LOG_INFO("[1/7] Initializing configuration...");
     if (!configManager.begin()) {
         LOG_ERROR("Failed to initialize configuration manager!");
     }
@@ -148,11 +152,11 @@ void setup() {
     FastLED.show();
 
     // Initialize USB Host for RetroTINK communication
-    LOG_INFO("[2/6] Initializing USB Host...");
+    LOG_INFO("[2/7] Initializing USB Host...");
     usbHost.begin();
 
     // Initialize RetroTINK controller with USB Host
-    LOG_INFO("[3/6] Initializing RetroTINK controller...");
+    LOG_INFO("[3/7] Initializing RetroTINK controller...");
     tink = new RetroTink(&usbHost);
     tink->begin();
 
@@ -161,8 +165,16 @@ void setup() {
         tink->addTrigger(trigger);
     }
 
+    // Initialize AVR controller
+    LOG_INFO("[4/7] Initializing AVR controller...");
+    auto avrConfig = configManager.getAvrConfig();
+    avrSerial = new TelnetSerial();
+    avrSerial->begin(avrConfig.ip, 23);
+    avr = new DenonAvr(avrSerial);
+    avr->begin(avrConfig.input, avrConfig.enabled);
+
     // Initialize video switcher
-    LOG_INFO("[4/6] Initializing %s...", switcherConfig.type.c_str());
+    LOG_INFO("[5/7] Initializing %s...", switcherConfig.type.c_str());
     extron = new ExtronSwVga(switcherConfig.txPin, switcherConfig.rxPin, 9600);
     if (!extron->begin()) {
         LOG_ERROR("Failed to initialize Extron handler!");
@@ -171,14 +183,15 @@ void setup() {
     // Enable signal-based auto-switching
     extron->setAutoSwitchEnabled(true);
 
-    // Connect Extron input changes to RetroTINK
+    // Connect Extron input changes to RetroTINK and AVR
     extron->onInputChange([](int input) {
         LOG_INFO("Input change detected: %d", input);
         tink->onExtronInputChange(input);
+        avr->onInputChange();
     });
 
     // Initialize WiFi manager
-    LOG_INFO("[5/6] Initializing WiFi...");
+    LOG_INFO("[6/7] Initializing WiFi...");
     wifiManager.begin(wifiConfig.hostname);
 
     // Set up WiFi state change callback
@@ -213,8 +226,8 @@ void setup() {
     }
 
     // Initialize web server
-    LOG_INFO("[6/6] Starting web server...");
-    webServer.begin(&wifiManager, &configManager, extron, tink);
+    LOG_INFO("[7/7] Starting web server...");
+    webServer.begin(&wifiManager, &configManager, extron, tink, avr);
     webServer.setLEDCallback(setLEDColor);
 
     LOG_RAW("\n");
@@ -245,6 +258,9 @@ void loop() {
 
     // Process USB Host events and RT4K communication
     tink->update();
+
+    // Process AVR commands and responses
+    avr->update();
 
     // Check for manual LED mode timeout
     unsigned long now = millis();

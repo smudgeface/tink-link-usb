@@ -7,6 +7,12 @@
     "hardware": {
         "ledPin": 21
     },
+    "avr": {
+        "type": "Denon X4300H",
+        "enabled": false,
+        "ip": "",
+        "input": "GAME"
+    },
     "hostname": "tinklink",
     "triggers": [
         {

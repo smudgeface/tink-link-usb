@@ -1,9 +1,9 @@
 #include "RetroTink.h"
-#include "UsbHostSerial.h"
+#include "SerialInterface.h"
 #include "Logger.h"
 
-RetroTink::RetroTink(UsbHostSerial* usb)
-    : _usb(usb)
+RetroTink::RetroTink(SerialInterface* serial)
+    : _serial(serial)
     , _lastCommand("")
     , _powerState(RT4KPowerState::UNKNOWN)
     , _pendingCommand("")
@@ -18,18 +18,18 @@ RetroTink::~RetroTink() {
 }
 
 void RetroTink::begin() {
-    if (_usb) {
-        LOG_INFO("RetroTink: Controller initialized (USB Host mode)");
+    if (_serial) {
+        LOG_INFO("RetroTink: Controller initialized (serial mode)");
     } else {
-        LOG_INFO("RetroTink: Controller initialized (stub mode - no USB Host)");
+        LOG_INFO("RetroTink: Controller initialized (stub mode - no serial)");
     }
 }
 
 void RetroTink::update() {
-    if (!_usb) return;
+    if (!_serial) return;
 
     // Process USB Host events
-    _usb->update();
+    _serial->update();
 
     // Read and parse incoming serial data from RT4K
     processIncomingData();
@@ -62,7 +62,7 @@ void RetroTink::onExtronInputChange(int input) {
     String command = generateCommand(*trigger);
 
     // Check if RT4K needs to be woken up
-    if (_usb && _powerState == RT4KPowerState::SLEEPING) {
+    if (_serial && _powerState == RT4KPowerState::SLEEPING) {
         // Confirmed sleeping - wake and wait for boot complete
         LOG_INFO("RetroTink: RT4K is sleeping - sending power on before command");
         sendCommand("pwr on");
@@ -80,7 +80,7 @@ void RetroTink::onExtronInputChange(int input) {
         return;
     }
 
-    if (_usb && _powerState == RT4KPowerState::UNKNOWN) {
+    if (_serial && _powerState == RT4KPowerState::UNKNOWN) {
         // Unknown state - send pwr on and wait briefly to see if RT4K responds.
         // If RT4K was off, we'll get "[MCU] Powering Up" within ~1s -> transition to BOOTING.
         // If RT4K was already on, no response arrives -> after 3s timeout, assume ON and send command.
@@ -118,8 +118,8 @@ void RetroTink::sendRawCommand(const String& command) {
 }
 
 bool RetroTink::isConnected() const {
-    if (!_usb) return false;
-    return _usb->isDeviceConnected();
+    if (!_serial) return false;
+    return _serial->isConnected();
 }
 
 const char* RetroTink::getPowerStateString() const {
@@ -159,10 +159,10 @@ String RetroTink::generateCommand(const TriggerMapping& trigger) const {
 void RetroTink::sendCommand(const String& command) {
     _lastCommand = command;
 
-    if (_usb && _usb->isDeviceConnected()) {
+    if (_serial && _serial->isConnected()) {
         // Frame command with leading/trailing CR for RT4K protocol
         String framed = "\r" + command + "\r";
-        if (_usb->sendData(framed)) {
+        if (_serial->sendData(framed)) {
             LOG_DEBUG("RetroTink TX: [%s]", command.c_str());
         } else {
             LOG_ERROR("RetroTink: Failed to send command: %s", command.c_str());
@@ -239,10 +239,10 @@ void RetroTink::processReceivedLine(const String& line) {
 }
 
 void RetroTink::processIncomingData() {
-    if (!_usb) return;
+    if (!_serial) return;
 
     String line;
-    while (_usb->readLine(line)) {
+    while (_serial->readLine(line)) {
         processReceivedLine(line);
     }
 }
