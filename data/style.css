@@ -107,7 +107,7 @@ button {
     background: #00d4ff;
     color: #000;
     border: none;
-    padding: 12px 24px;
+    padding: 8px 20px;
     border-radius: 4px;
     font-size: 1em;
     font-weight: 600;
@@ -404,6 +404,7 @@ nav a.active {
     padding: 10px 16px;
     border-radius: 0;
     font-size: 0.9em;
+    flex-shrink: 0;
 }
 
 .quick-commands {
@@ -429,12 +430,28 @@ nav a.active {
     min-width: 70px;
 }
 
-/* Mobile button wrapping */
+/* Mobile responsive */
 @media (max-width: 480px) {
     .btn-row {
         flex-direction: column;
     }
     .btn-row button {
         width: 100%;
+    }
+    .console-input-bar select {
+        width: 55px;
+        font-size: 0.7em;
+        padding: 8px 2px 8px 4px;
+    }
+    .console-input-bar .prompt {
+        padding: 10px 4px;
+    }
+    .console-input-bar input {
+        min-width: 0;
+        font-size: 12px;
+    }
+    .console-input-bar button {
+        padding: 10px 10px;
+        font-size: 0.8em;
     }
 }

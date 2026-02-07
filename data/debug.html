@@ -22,7 +22,7 @@
         <div class="card">
             <h2>System Console</h2>
             <p style="margin-bottom: 10px; font-size: 0.9em; color: #888;">
-                Shows system logs and UART messages. UART: GPIO43 (TX) / GPIO44 (RX) @ 9600 baud.
+                Shows system logs and UART messages.
             </p>
 
             <!-- Console Output -->
@@ -74,7 +74,6 @@
 
         <div class="card">
             <h2>LED Color Tester</h2>
-            <p>Test WS2812 RGB LED colors (GPIO21)</p>
             <p><strong>Note:</strong> LED will return to WiFi state indication mode after 10 seconds</p>
 
             <div style="margin-top: 20px;">
@@ -93,20 +92,24 @@
                 <div style="margin-top: 20px;">
                     <h3>Custom RGB Values</h3>
                     <form id="led-form" onsubmit="return setCustomLED(event)">
-                        <div style="display: flex; gap: 10px; align-items: end;">
+                        <div style="display: flex; gap: 10px; align-items: flex-end;">
                             <div class="input-group" style="flex: 1;">
-                                <label for="led-r">Red (0-255)</label>
+                                <label for="led-r">Red</label>
                                 <input type="number" id="led-r" min="0" max="255" value="255">
                             </div>
                             <div class="input-group" style="flex: 1;">
-                                <label for="led-g">Green (0-255)</label>
+                                <label for="led-g">Green</label>
                                 <input type="number" id="led-g" min="0" max="255" value="0">
                             </div>
                             <div class="input-group" style="flex: 1;">
-                                <label for="led-b">Blue (0-255)</label>
+                                <label for="led-b">Blue</label>
                                 <input type="number" id="led-b" min="0" max="255" value="0">
                             </div>
-                            <button type="submit" style="margin-bottom: 10px;">Set Color</button>
+                            <div class="input-group" style="flex: 1; margin-bottom: 18px;">
+                                <label for="led-b"></label>
+                                <button type="submit">Set Color</button>
+                            </div>
+                            
                         </div>
                     </form>
                 </div>
@@ -128,7 +131,7 @@
                 <form id="ota-firmware-form" onsubmit="return uploadOTA(event, 'firmware')">
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <input type="file" id="firmware-file" accept=".bin" style="flex: 1;">
-                        <button type="submit" id="firmware-upload-btn">Upload Firmware</button>
+                        <button type="submit" id="firmware-upload-btn">Upload File</button>
                     </div>
                 </form>
             </div>
@@ -138,7 +141,7 @@
                 <form id="ota-fs-form" onsubmit="return uploadOTA(event, 'fs')">
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <input type="file" id="fs-file" accept=".bin" style="flex: 1;">
-                        <button type="submit" id="fs-upload-btn">Upload Filesystem</button>
+                        <button type="submit" id="fs-upload-btn">Upload File</button>
                     </div>
                 </form>
             </div>
@@ -254,7 +257,7 @@
 
             // Add timestamp prefix for backend messages (if provided)
             const tsPrefix = timestamp !== undefined ?
-                '<span style="color: #666;">' + formatTimestamp(timestamp) + '</span> ' : '';
+                '<span style="color: #b6b6b6;">' + formatTimestamp(timestamp) + '</span> ' : '';
 
             if (type === 'tx-extron') {
                 line.innerHTML = '<span style="color: #569cd6;">[switcher] &gt; ' + escapeHtml(text) + '</span>';
@@ -273,7 +276,7 @@
             } else if (type === 'rx') {
                 line.innerHTML = tsPrefix + '<span style="color: #4ec9b0;">&lt; ' + escapeHtml(text) + '</span>';
             } else if (type === 'log-debug') {
-                line.innerHTML = tsPrefix + '<span style="color: #808080;">[D] ' + escapeHtml(text) + '</span>';
+                line.innerHTML = tsPrefix + '<span style="color: #b6b6b6;">[D] ' + escapeHtml(text) + '</span>';
             } else if (type === 'log-info') {
                 line.innerHTML = tsPrefix + '<span style="color: #9cdcfe;">[I] ' + escapeHtml(text) + '</span>';
             } else if (type === 'log-warn') {

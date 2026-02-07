@@ -107,7 +107,7 @@
                         <label for="avr-ip">AVR IP Address</label>
                         <div style="display: flex; gap: 8px; align-items: start;">
                             <input type="text" id="avr-ip" placeholder="192.168.1.100" style="flex: 1;">
-                            <button type="button" class="secondary" id="avr-discover-btn" onclick="discoverAvr()" style="white-space: nowrap; padding: 8px 12px;">Discover</button>
+                            <button type="button" class="secondary" id="avr-discover-btn" onclick="discoverAvr()">Discover</button>
                         </div>
                         <select id="avr-discovered" style="display: none; margin-top: 8px;" onchange="selectDiscoveredAvr()">
                             <option value="">-- Select AVR --</option>
@@ -137,6 +137,7 @@
                     <button type="submit">Save AVR Config</button>
                     <button type="button" class="secondary" onclick="testAvrConnection()">Test Connection</button>
                 </div>
+                <div id="avr-message"></div>
             </form>
         </div>
 
@@ -542,10 +543,16 @@
             return false;
         }
 
+        function showAvrMessage(text, type) {
+            const msg = document.getElementById('avr-message');
+            msg.innerHTML = `<div class="message ${type}" style="margin-top: 15px;">${text}</div>`;
+            setTimeout(() => msg.innerHTML = '', 5000);
+        }
+
         function testAvrConnection() {
             const ip = document.getElementById('avr-ip').value;
             if (!ip) {
-                showMessage('Please enter an IP address first', 'error');
+                showAvrMessage('Please enter an IP address first', 'error');
                 return;
             }
 
@@ -565,13 +572,13 @@
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    showMessage('AVR test failed: ' + data.error, 'error');
+                    showAvrMessage('AVR test failed: ' + data.error, 'error');
                 } else {
-                    showMessage('AVR test command sent (PW?). Check debug console for response.', 'success');
+                    showAvrMessage('Test command sent (PW?). Check <a href="/debug.html" style="color: #00ff88;">debug console</a> for response.', 'success');
                 }
             })
             .catch(err => {
-                showMessage('AVR test failed: ' + err, 'error');
+                showAvrMessage('AVR test failed: ' + err, 'error');
             });
         }
 
