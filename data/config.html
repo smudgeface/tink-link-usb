@@ -12,7 +12,7 @@
 
         <nav>
             <a href="/">Status</a>
-            <a href="/config.html">Config</a>
+            <a href="/config.html" class="active">Config</a>
             <a href="/debug.html">Debug</a>
             <a href="/api.html">API</a>
         </nav>
@@ -65,7 +65,7 @@
         <div class="card">
             <h2>Connect to Network</h2>
             <div class="message info" style="margin-bottom: 15px;">
-                <strong>⚠️ Note:</strong> After connecting to a new network, the device IP address will likely change.
+                <strong>Note:</strong> After connecting to a new network, the device IP address will likely change.
                 <br>Wait for the <strong>LED to turn green</strong>, then navigate to <strong>http://tinklink.local</strong>
             </div>
             <form id="connect-form" onsubmit="return connectNetwork(event)">
@@ -95,12 +95,14 @@
             </div>
 
             <form id="avr-form" onsubmit="return saveAvrConfig(event)">
+                <div class="toggle-row">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="avr-enabled">
+                        <span class="slider"></span>
+                    </label>
+                    <span>Enable AVR Control</span>
+                </div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 15px;">
-                    <div class="input-group">
-                        <label>
-                            <input type="checkbox" id="avr-enabled"> Enable AVR Control
-                        </label>
-                    </div>
                     <div class="input-group">
                         <label for="avr-ip">AVR IP Address</label>
                         <div style="display: flex; gap: 8px; align-items: start;">
@@ -178,6 +180,10 @@
                 </div>
             </form>
         </div>
+
+        <footer class="footer">
+            TinkLink-USB &middot; <a href="/api.html">API</a>
+        </footer>
     </div>
 
     <script>

@@ -33,7 +33,7 @@ h2 {
     color: #00d4ff;
     margin: 20px 0 15px;
     font-size: 1.2em;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
     padding-bottom: 8px;
 }
 
@@ -113,6 +113,7 @@ button {
     font-weight: 600;
     cursor: pointer;
     transition: background 0.2s;
+    white-space: nowrap;
 }
 
 button:hover {
@@ -210,23 +211,41 @@ button.secondary:hover {
 }
 
 .message.info {
-    background: rgba(0, 212, 255, 0.1);
-    border: 1px solid #00d4ff;
-    color: #00d4ff;
+    background: rgba(0, 212, 255, 0.06);
+    border: none;
+    border-left: 3px solid #00d4ff;
+    color: #aab;
 }
 
 nav {
     margin-bottom: 20px;
+    background: #16213e;
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 nav a {
     color: #00d4ff;
     text-decoration: none;
-    margin-right: 20px;
+    padding: 6px 14px;
+    border-radius: 4px;
+    transition: background 0.2s;
 }
 
 nav a:hover {
-    text-decoration: underline;
+    background: #1f3460;
+    text-decoration: none;
+}
+
+nav a.active {
+    background: #00d4ff;
+    color: #000;
+    font-weight: 600;
+    text-decoration: none;
 }
 
 .loading {
@@ -248,4 +267,174 @@ nav a:hover {
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-right: 10px;
+}
+
+/* Utility classes */
+.text-muted { color: #888; font-size: 0.9em; }
+.text-muted-sm { color: #888; font-size: 0.85em; }
+.mb-sm { margin-bottom: 10px; }
+.mb-md { margin-bottom: 15px; }
+.mb-lg { margin-bottom: 20px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.btn-sm { font-size: 0.85em; padding: 5px 12px; }
+
+/* Toggle switch */
+.toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-switch .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #333;
+    border-radius: 24px;
+    transition: background 0.2s;
+}
+
+.toggle-switch .slider:before {
+    content: "";
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: #eee;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+
+.toggle-switch input:checked + .slider {
+    background: #00d4ff;
+}
+
+.toggle-switch input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    padding: 20px 0 10px;
+    color: #555;
+    font-size: 0.8em;
+    border-top: 1px solid #222;
+    margin-top: 20px;
+}
+
+.footer a {
+    color: #00d4ff;
+    text-decoration: none;
+}
+
+/* Console styles */
+.console-output {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #d4d4d4;
+    height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.console-wrap {
+    background: #1e1e1e;
+    border-radius: 4px 4px 0 0;
+    padding: 10px;
+}
+
+.console-input-bar {
+    display: flex;
+    background: #2d2d30;
+    border-radius: 0 0 4px 4px;
+    overflow: hidden;
+    align-items: center;
+}
+
+.console-input-bar select {
+    background: #3e3e42;
+    color: #d4d4d4;
+    border: none;
+    padding: 8px 4px 8px 8px;
+    font-size: 0.8em;
+    outline: none;
+    cursor: pointer;
+    width: 80px;
+}
+
+.console-input-bar .prompt {
+    color: #569cd6;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    padding: 10px 8px;
+}
+
+.console-input-bar input {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    background: transparent;
+    color: #d4d4d4;
+    border: none;
+    padding: 10px 8px;
+    font-size: 14px;
+    outline: none;
+}
+
+.console-input-bar button {
+    padding: 10px 16px;
+    border-radius: 0;
+    font-size: 0.9em;
+}
+
+.quick-commands {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #333;
+}
+
+.quick-cmd-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.quick-cmd-group:last-child {
+    margin-bottom: 0;
+}
+
+.quick-cmd-label {
+    font-size: 0.8em;
+    color: #666;
+    min-width: 70px;
+}
+
+/* Mobile button wrapping */
+@media (max-width: 480px) {
+    .btn-row {
+        flex-direction: column;
+    }
+    .btn-row button {
+        width: 100%;
+    }
 }

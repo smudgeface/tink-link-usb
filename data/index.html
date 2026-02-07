@@ -11,7 +11,7 @@
         <h1>TinkLink-USB <span id="version" class="version"></span></h1>
 
         <nav>
-            <a href="/">Status</a>
+            <a href="/" class="active">Status</a>
             <a href="/config.html">Config</a>
             <a href="/debug.html">Debug</a>
             <a href="/api.html">API</a>
@@ -91,6 +91,10 @@
                 <div class="loading">Loading...</div>
             </div>
         </div>
+
+        <footer class="footer">
+            TinkLink-USB &middot; <a href="/api.html">API</a>
+        </footer>
     </div>
 
     <script>
@@ -147,7 +151,7 @@
                             </div>
                         `).join('');
                     } else {
-                        triggerList.innerHTML = '<div class="loading">No triggers configured</div>';
+                        triggerList.innerHTML = '<div class="loading">No triggers configured — <a href="/config.html" style="color: #00d4ff;">Configure</a></div>';
                     }
                 })
                 .catch(err => {

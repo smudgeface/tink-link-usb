@@ -13,7 +13,7 @@
         <nav>
             <a href="/">Status</a>
             <a href="/config.html">Config</a>
-            <a href="/debug.html">Debug</a>
+            <a href="/debug.html" class="active">Debug</a>
             <a href="/api.html">API</a>
         </nav>
 
@@ -26,8 +26,8 @@
             </p>
 
             <!-- Console Output -->
-            <div style="background: #1e1e1e; border-radius: 4px 4px 0 0; padding: 10px;">
-                <div id="console-output" style="font-family: 'Courier New', monospace; font-size: 13px; color: #d4d4d4; height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;"><span style="color: #569cd6;">TinkLink-USB Serial Console</span>
+            <div class="console-wrap">
+                <div id="console-output" class="console-output"><span style="color: #569cd6;">TinkLink-USB Serial Console</span>
 <span style="color: #6a9955;">Ready. Type below and press Enter to send.</span>
 
 </div>
@@ -35,41 +35,40 @@
 
             <!-- Console Input -->
             <form id="console-form" onsubmit="return sendConsoleCommand(event)" style="margin: 0;">
-                <div style="display: flex; background: #2d2d30; border-radius: 0 0 4px 4px; overflow: hidden; align-items: center;">
-                    <select id="console-target" style="background: #3e3e42; color: #d4d4d4; border: none; padding: 8px 4px 8px 8px; font-size: 0.8em; outline: none; cursor: pointer; width: 80px;">
+                <div class="console-input-bar">
+                    <select id="console-target">
                         <option value="extron">Switcher</option>
                         <option value="tink">Tink</option>
                         <option value="avr">AVR</option>
                     </select>
-                    <span style="color: #569cd6; font-family: 'Courier New', monospace; font-weight: bold; padding: 10px 8px 10px 8px;">&gt;</span>
+                    <span class="prompt">&gt;</span>
                     <input type="text" id="console-input" placeholder="Enter command..."
-                           style="flex: 1; font-family: 'Courier New', monospace; background: transparent; color: #d4d4d4; border: none; padding: 10px 8px; font-size: 14px; outline: none;"
                            autocomplete="off" autofocus>
-                    <button type="submit" style="padding: 10px 16px; border-radius: 0; font-size: 0.9em;">Send</button>
+                    <button type="submit">Send</button>
                 </div>
             </form>
 
             <!-- Quick Commands -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid #333; gap: 16px; flex-wrap: wrap;">
-                <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-                    <div style="display: flex; gap: 6px; align-items: center;">
-                        <span style="font-size: 0.75em; color: #666;">Switcher:</span>
-                        <button class="secondary" onclick="quickConsoleCommand('TEST', 'extron')" style="font-size: 0.8em; padding: 4px 10px;">TEST</button>
-                        <button class="secondary" onclick="quickConsoleCommand('HELLO', 'extron')" style="font-size: 0.8em; padding: 4px 10px;">HELLO</button>
-                    </div>
-                    <div style="display: flex; gap: 6px; align-items: center;">
-                        <span style="font-size: 0.75em; color: #666;">RetroTINK:</span>
-                        <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=1', 'tink')" style="font-size: 0.8em; padding: 4px 10px;">Profile 1</button>
-                        <button class="secondary" onclick="quickConsoleCommand('SVS NEW INPUT=2', 'tink')" style="font-size: 0.8em; padding: 4px 10px;">Profile 2</button>
-                    </div>
-                    <div style="display: flex; gap: 6px; align-items: center;">
-                        <span style="font-size: 0.75em; color: #666;">AVR:</span>
-                        <button class="secondary" onclick="quickConsoleCommand('PWON', 'avr')" style="font-size: 0.8em; padding: 4px 10px;">Power On</button>
-                        <button class="secondary" onclick="quickConsoleCommand('PW?', 'avr')" style="font-size: 0.8em; padding: 4px 10px;">Status</button>
-                        <button class="secondary" onclick="quickConsoleCommand('SI?', 'avr')" style="font-size: 0.8em; padding: 4px 10px;">Input?</button>
-                    </div>
+            <div class="quick-commands">
+                <div class="quick-cmd-group">
+                    <span class="quick-cmd-label">Switcher:</span>
+                    <button class="secondary btn-sm" onclick="quickConsoleCommand('TEST', 'extron')">TEST</button>
+                    <button class="secondary btn-sm" onclick="quickConsoleCommand('HELLO', 'extron')">HELLO</button>
                 </div>
-                <button type="button" class="secondary" onclick="clearConsole()" style="padding: 6px 12px; font-size: 0.8em;">Clear</button>
+                <div class="quick-cmd-group">
+                    <span class="quick-cmd-label">RetroTINK:</span>
+                    <button class="secondary btn-sm" onclick="quickConsoleCommand('SVS NEW INPUT=1', 'tink')">Profile 1</button>
+                    <button class="secondary btn-sm" onclick="quickConsoleCommand('SVS NEW INPUT=2', 'tink')">Profile 2</button>
+                </div>
+                <div class="quick-cmd-group">
+                    <span class="quick-cmd-label">AVR:</span>
+                    <button class="secondary btn-sm" onclick="quickConsoleCommand('PWON', 'avr')">Power On</button>
+                    <button class="secondary btn-sm" onclick="quickConsoleCommand('PW?', 'avr')">Status</button>
+                    <button class="secondary btn-sm" onclick="quickConsoleCommand('SI?', 'avr')">Input?</button>
+                </div>
+                <div class="quick-cmd-group" style="justify-content: flex-end;">
+                    <button type="button" class="secondary btn-sm" onclick="clearConsole()">Clear</button>
+                </div>
             </div>
         </div>
 
@@ -81,14 +80,14 @@
             <div style="margin-top: 20px;">
                 <h3>Color Test Buttons</h3>
                 <div class="btn-row" style="flex-wrap: wrap; gap: 8px;">
-                    <button onclick="setLEDColor('red')" style="background: #dc3545;">🔴 Red</button>
-                    <button onclick="setLEDColor('green')" style="background: #28a745;">🟢 Green</button>
-                    <button onclick="setLEDColor('blue')" style="background: #007bff;">🔵 Blue</button>
-                    <button onclick="setLEDColor('yellow')" style="background: #ffc107; color: #000;">🟡 Yellow</button>
-                    <button onclick="setLEDColor('cyan')" style="background: #17a2b8;">🟦 Cyan</button>
-                    <button onclick="setLEDColor('magenta')" style="background: #e83e8c;">🟣 Magenta</button>
-                    <button onclick="setLEDColor('white')" style="background: #f8f9fa; color: #000;">⚪ White</button>
-                    <button onclick="setLEDColor('off')" style="background: #343a40;">⚫ Off</button>
+                    <button onclick="setLEDColor('red')" style="background: #dc3545;">Red</button>
+                    <button onclick="setLEDColor('green')" style="background: #28a745;">Green</button>
+                    <button onclick="setLEDColor('blue')" style="background: #007bff;">Blue</button>
+                    <button onclick="setLEDColor('yellow')" style="background: #ffc107; color: #000;">Yellow</button>
+                    <button onclick="setLEDColor('cyan')" style="background: #17a2b8;">Cyan</button>
+                    <button onclick="setLEDColor('magenta')" style="background: #e83e8c;">Magenta</button>
+                    <button onclick="setLEDColor('white')" style="background: #f8f9fa; color: #000;">White</button>
+                    <button onclick="setLEDColor('off')" style="background: #343a40;">Off</button>
                 </div>
 
                 <div style="margin-top: 20px;">
@@ -113,7 +112,7 @@
                 </div>
 
                 <div style="margin-top: 15px;">
-                    <button onclick="resetLED()" class="secondary">↩️ Return to WiFi Mode</button>
+                    <button onclick="resetLED()" class="secondary">Return to WiFi Mode</button>
                 </div>
             </div>
         </div>
@@ -152,6 +151,9 @@
             </div>
         </div>
 
+        <footer class="footer">
+            TinkLink-USB &middot; <a href="/api.html">API</a>
+        </footer>
     </div>
 
     <script>
