@@ -160,10 +160,13 @@
     </div>
 
     <script>
+        let messageTimeout = null;
+
         function showMessage(text, type) {
             const msg = document.getElementById('message');
             msg.innerHTML = `<div class="message ${type}">${text}</div>`;
-            setTimeout(() => msg.innerHTML = '', 5000);
+            if (messageTimeout) clearTimeout(messageTimeout);
+            messageTimeout = setTimeout(() => msg.innerHTML = '', 5000);
         }
 
         function setLEDColor(color) {

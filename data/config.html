@@ -179,6 +179,7 @@
                     <button type="submit" id="trigger-submit-btn">Add Trigger</button>
                     <button type="button" class="secondary" onclick="cancelTriggerEdit()">Cancel</button>
                 </div>
+                <div id="triggers-message"></div>
             </form>
         </div>
 
@@ -188,10 +189,15 @@
     </div>
 
     <script>
+        let messageTimeout = null;
+        let avrMessageTimeout = null;
+        let triggersMessageTimeout = null;
+
         function showMessage(text, type) {
             const msg = document.getElementById('message');
             msg.innerHTML = `<div class="message ${type}">${text}</div>`;
-            setTimeout(() => msg.innerHTML = '', 5000);
+            if (messageTimeout) clearTimeout(messageTimeout);
+            messageTimeout = setTimeout(() => msg.innerHTML = '', 5000);
         }
 
         function updateStatus() {
@@ -481,15 +487,15 @@
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    showMessage('Failed to save triggers: ' + data.error, 'error');
+                    showTriggersMessage('Failed to save triggers: ' + data.error, 'error');
                 } else {
-                    showMessage('Triggers saved successfully', 'success');
+                    showTriggersMessage('Triggers saved successfully', 'success');
                     cancelTriggerEdit();
                     renderTriggers();
                 }
             })
             .catch(err => {
-                showMessage('Failed to save triggers', 'error');
+                showTriggersMessage('Failed to save triggers', 'error');
                 console.error('Save failed:', err);
             });
         }
@@ -514,7 +520,7 @@
             const input = document.getElementById('avr-input').value;
 
             if (enabled && !ip) {
-                showMessage('Please enter the AVR IP address', 'error');
+                showAvrMessage('Please enter the AVR IP address', 'error');
                 return false;
             }
 
@@ -530,13 +536,13 @@
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    showMessage('Failed to save AVR config: ' + data.error, 'error');
+                    showAvrMessage('Failed to save AVR config: ' + data.error, 'error');
                 } else {
-                    showMessage('AVR configuration saved', 'success');
+                    showAvrMessage('AVR configuration saved', 'success');
                 }
             })
             .catch(err => {
-                showMessage('Failed to save AVR config', 'error');
+                showAvrMessage('Failed to save AVR config', 'error');
                 console.error('Save failed:', err);
             });
 
@@ -546,7 +552,15 @@
         function showAvrMessage(text, type) {
             const msg = document.getElementById('avr-message');
             msg.innerHTML = `<div class="message ${type}" style="margin-top: 15px;">${text}</div>`;
-            setTimeout(() => msg.innerHTML = '', 5000);
+            if (avrMessageTimeout) clearTimeout(avrMessageTimeout);
+            avrMessageTimeout = setTimeout(() => msg.innerHTML = '', 5000);
+        }
+
+        function showTriggersMessage(text, type) {
+            const msg = document.getElementById('triggers-message');
+            msg.innerHTML = `<div class="message ${type}" style="margin-top: 15px;">${text}</div>`;
+            if (triggersMessageTimeout) clearTimeout(triggersMessageTimeout);
+            triggersMessageTimeout = setTimeout(() => msg.innerHTML = '', 5000);
         }
 
         function testAvrConnection() {
