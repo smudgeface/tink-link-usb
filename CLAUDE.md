@@ -6,7 +6,7 @@ This document provides guidelines and conventions for Claude (AI assistant) when
 
 TinkLink-USB is an ESP32-S3 USB bridge between video switchers and the RetroTINK 4K. It automatically triggers RetroTINK profile changes when video switcher inputs change.
 
-**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, and SSDP discovery all functional. Version 1.8.0.
+**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, and SSDP discovery all functional. Version 1.9.0.
 
 **Tech Stack:**
 - Platform: ESP32-S3 (Arduino framework, USB OTG mode)
@@ -64,14 +64,23 @@ Version is stored in `src/version.h`:
 
 ### Git Tags
 
-After significant releases, create annotated tags:
+After significant releases, create annotated tags. Tag messages should include a one-line summary followed by a bullet point for each major change area — matching the level of detail used in the README changelog:
 
 ```bash
-git tag -a v1.3.0 -m "Phase 2 complete: API refactoring and modular design"
-git push origin v1.3.0
-```
+git tag -a v1.9.0 -m "$(cat <<'EOF'
+Release v1.9.0: Pluggable switcher architecture, ESP32-C3 support, and power management
 
-Tag messages should summarize the release milestone.
+- Pluggable switcher architecture — Abstract Switcher base class with SwitcherFactory; renamed ExtronSwVga to ExtronSwVgaSwitcher; all Extron-specific naming generalized
+- Serial transport refactoring — New UartSerial class; each device class owns its serial transport internally
+- ConfigManager refactoring — Replaced typed config structs with raw JsonDocument storage; new accessors and "tink" config section
+- RetroTINK power management — Configurable serialMode (usb/uart) and powerManagementMode (off/simple/full)
+- ESP32-C3 support — New env:esp32c3 environment; NO_USB_HOST build flag; separate data_c3/ directory
+- LED configuration — New ledColorOrder config field; runtime color order selection; GPIO8 support for C3
+- Documentation — New ALTERNATIVE_BOARDS.md guide
+EOF
+)"
+git push origin v1.9.0
+```
 
 ## Code Style & Conventions
 
@@ -393,4 +402,4 @@ tink-link-usb/
 
 ---
 
-**Last Updated**: 2026 (v1.8.0)
+**Last Updated**: 2026 (v1.9.0)

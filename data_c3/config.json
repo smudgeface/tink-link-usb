@@ -10,8 +10,8 @@
         "serialMode": "uart",
         "powerManagementMode": "full",
         "uartId": 1,
-        "txPin": 7,
-        "rxPin": 6
+        "txPin": 0,
+        "rxPin": 1
     },
     "hardware": {
         "ledPin": 8,

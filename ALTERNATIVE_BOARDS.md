@@ -29,8 +29,8 @@ The C3 uses both hardware UARTs — one for the video switcher, one for the Retr
 |----------|------|------|------|
 | Switcher TX | UART0 | 21 | 9600 |
 | Switcher RX | UART0 | 20 | 9600 |
-| RetroTINK TX | UART1 | 7 | 115200 |
-| RetroTINK RX | UART1 | 6 | 115200 |
+| RetroTINK TX | UART1 | 0 | 115200 |
+| RetroTINK RX | UART1 | 1 | 115200 |
 | Status LED | — | 8 | — |
 
 Both the switcher and RetroTINK connections require RS-232 level shifters (MAX3232 or similar) between the ESP32-C3's 3.3V GPIOs and the RS-232 voltage levels on the devices.
@@ -61,8 +61,8 @@ The C3 uses a separate filesystem image (`data_c3/`) with board-specific default
         "serialMode": "uart",
         "powerManagementMode": "full",
         "uartId": 1,
-        "txPin": 7,
-        "rxPin": 6
+        "txPin": 0,
+        "rxPin": 1
     },
     "hardware": {
         "ledPin": 8,
