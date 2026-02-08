@@ -71,7 +71,7 @@ The C3 uses a separate filesystem image (`data_c3/`) with board-specific default
 }
 ```
 
-Adjust pin numbers if your wiring differs. Edit `triggers` to match your switcher inputs and RT4K profiles (see the main [README](README.md) for trigger configuration details).
+Adjust pin numbers if your wiring differs. Edit `triggers` to match your switcher inputs and RT4K profiles. See [Configuration Reference](CONFIGURATION.md) for detailed descriptions of all settings.
 
 #### Power Management Modes
 
@@ -118,5 +118,6 @@ pio run -t otafs -e esp32c3
 
 ### References
 
+- [Configuration Reference](CONFIGURATION.md) — Complete guide to all config.json and wifi.json settings
 - [ESP32-C3 Super Mini Plus — ESPBoards.dev](https://www.espboards.dev/esp32/esp32-c3-super-mini-plus/)
 - [ESP32-C3 Datasheet](https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf)
