@@ -252,6 +252,8 @@ pio run -e esp32s3 -t uploadfs
 
 **Important**: You must run this command to access the web interface. Without it, you'll see "Not Found" errors when browsing to the device.
 
+See [Configuration Reference](CONFIGURATION.md) for details on all settings in `config.json` and `wifi.json`.
+
 #### Step 6: Monitor Serial Output (Optional)
 
 To view debug output and verify the device is working:
@@ -457,6 +459,7 @@ tink-link-usb/
 ├── README.md
 ├── ALTERNATIVE_BOARDS.md      # Guide for ESP32-C3 and other boards
 ├── CLAUDE.md                  # AI assistant development guide
+├── CONFIGURATION.md           # Configuration reference for all settings
 ├── platformio.ini
 ├── assets/
 │   ├── docs/                  # Reference documentation

@@ -281,6 +281,8 @@ Before committing significant changes:
 2. Update `loadConfig()` and `saveConfig()` in `ConfigManager.cpp`
 3. Update default `data/config.json`
 4. Update web UI if needed
+5. Update default `data_c3/config.json` if the option applies to ESP32-C3
+6. Update `CONFIGURATION.md` with the new field (type, defaults, description)
 
 ### Changing Pin Assignments
 
@@ -367,7 +369,8 @@ tink-link-usb/
 │   └── logs.py        # Remote log viewer
 ├── platformio.ini     # PlatformIO configuration
 ├── README.md          # User documentation
-└── CLAUDE.md          # This file (AI assistant guide)
+├── CLAUDE.md          # This file (AI assistant guide)
+└── CONFIGURATION.md   # Configuration reference for all settings
 ```
 
 ## Additional Notes
@@ -395,6 +398,7 @@ tink-link-usb/
 ## References
 
 - **User Documentation**: README.md
+- **Configuration Reference**: CONFIGURATION.md
 - **API Reference**: http://tinklink.local/api.html (when device is running)
 - **Repository**: https://github.com/smudgeface/tink-link-usb
 - **HEOS CLI Protocol Specification**: assets/docs/HEOS_CLI_Protocol_Specification.pdf
