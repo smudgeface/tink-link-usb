@@ -7,7 +7,7 @@
 
 class WifiManager;
 class ConfigManager;
-class ExtronSwVga;
+class Switcher;
 class RetroTink;
 class DenonAvr;
 
@@ -63,11 +63,11 @@ public:
      * Start the web server with required dependencies.
      * @param wifi WiFi manager for network operations
      * @param config Configuration manager for settings
-     * @param extron Extron handler for UART operations
+     * @param switcher Video switcher handler for commands
      * @param tink RetroTINK controller for commands
      * @param avr Denon AVR controller (nullptr if not used)
      */
-    void begin(WifiManager* wifi, ConfigManager* config, ExtronSwVga* extron, RetroTink* tink, DenonAvr* avr = nullptr);
+    void begin(WifiManager* wifi, ConfigManager* config, Switcher* switcher, RetroTink* tink, DenonAvr* avr = nullptr);
 
     /** Stop the web server. */
     void end();
@@ -82,7 +82,7 @@ private:
     AsyncWebServer* _server;
     WifiManager* _wifi;
     ConfigManager* _config;
-    ExtronSwVga* _extron;
+    Switcher* _switcher;
     RetroTink* _tink;
     DenonAvr* _avr;
     LEDControlCallback _ledCallback;

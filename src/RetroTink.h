@@ -2,18 +2,19 @@
 #define RETROTINK_H
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <vector>
 
 class SerialInterface;
 
 /**
- * Mapping from Extron input number to RetroTINK 4K profile.
+ * Mapping from video switcher input number to RetroTINK 4K profile.
  *
- * When the specified Extron input is selected, the corresponding
+ * When the specified switcher input is selected, the corresponding
  * RetroTINK command is sent to switch profiles.
  */
 struct TriggerMapping {
-    int extronInput;  ///< Extron input number (1-based)
+    int switcherInput;  ///< Switcher input number (1-based)
 
     /**
      * Command mode for RetroTINK profile switching.
@@ -43,10 +44,32 @@ enum class RT4KPowerState {
 };
 
 /**
+ * Power management mode for RetroTINK communication.
+ *
+ * Controls how TinkLink handles RT4K power state:
+ * - OFF: No power management. Commands sent immediately. User must ensure
+ *   RT4K is on. Best when the RT4K is always on and power management is
+ *   not needed.
+ * - SIMPLE: On first input change, sends "pwr on" and waits 15 seconds
+ *   before sending the profile command. All subsequent commands are sent
+ *   immediately. Suitable when power state messages are not available.
+ * - FULL: Tracks RT4K power state via serial messages (Powering Up, Boot
+ *   Sequence Complete, Power Off). Requires that the serial connection
+ *   provides these status messages. Default mode.
+ */
+enum class PowerManagementMode {
+    OFF,     ///< No power management, always send commands immediately
+    SIMPLE,  ///< One-time "pwr on" + 15s wait on first use, then immediate
+    FULL     ///< Full state tracking via serial messages
+};
+
+/**
  * RetroTINK 4K controller via serial interface.
  *
- * Communicates with the RetroTINK 4K over a SerialInterface transport
- * (typically USB FTDI at 115200 baud 8N1).
+ * Communicates with the RetroTINK 4K over a SerialInterface transport.
+ * Supports two modes:
+ * - USB: USB FTDI (default) at 115200 baud 8N1
+ * - UART: Hardware UART at 115200 baud 8N1
  *
  * Features:
  * - Profile switching via SVS or remote commands
@@ -59,28 +82,44 @@ enum class RT4KPowerState {
  * - Trailing CR terminates the command
  *
  * Usage:
- *   UsbHostSerial usb;
- *   RetroTink tink(&usb);
+ *   RetroTink tink;
+ *   tink.configure(config);  // config contains serialMode, uartId, txPin, rxPin
  *   tink.begin();
  *   tink.addTrigger({1, TriggerMapping::SVS, 1, "Console 1"});
  *   // In loop():
  *   tink.update();
- *   tink.onExtronInputChange(1);  // Sends "SVS NEW INPUT=1"
+ *   tink.onSwitcherInputChange(1);  // Sends "SVS NEW INPUT=1"
  */
 class RetroTink {
 public:
     /**
-     * Create RetroTINK controller with serial interface.
-     * @param serial Pointer to SerialInterface instance (nullptr for stub mode)
+     * Create RetroTINK controller.
+     * Call configure() to set up the serial transport.
      */
-    explicit RetroTink(SerialInterface* serial = nullptr);
+    RetroTink();
     ~RetroTink();
 
     /**
-     * Initialize the RetroTINK controller.
-     * Logs serial or stub mode status.
+     * Configure the RetroTINK controller from JSON settings.
+     * Creates either USB Host or UART serial transport based on config.
+     *
+     * Config fields:
+     * - serialMode: "usb" (default) or "uart"
+     * - powerManagementMode: "off", "simple", or "full" (default "full")
+     * - uartId: UART number (for uart mode, default 2)
+     * - txPin: TX GPIO pin (for uart mode, default 17)
+     * - rxPin: RX GPIO pin (for uart mode, default 18)
+     *
+     * @param config JSON object containing RetroTINK configuration
      */
-    void begin();
+    void configure(const JsonObject& config);
+
+    /**
+     * Initialize the RetroTINK controller and its transport.
+     * Must be called after configure() and before update().
+     * @return true on success
+     */
+    bool begin();
 
     /**
      * Process serial data and pending commands.
@@ -92,7 +131,7 @@ public:
     void update();
 
     /**
-     * Add a trigger mapping from Extron input to RetroTINK profile.
+     * Add a trigger mapping from switcher input to RetroTINK profile.
      * @param trigger The input-to-profile mapping to add
      */
     void addTrigger(const TriggerMapping& trigger);
@@ -103,12 +142,12 @@ public:
     void clearTriggers();
 
     /**
-     * Handle an Extron input change event.
+     * Handle a video switcher input change event.
      * If RT4K is sleeping, sends power-on first and queues the profile command.
      * If RT4K is on, sends the profile command immediately.
-     * @param input The new Extron input number (1-based)
+     * @param input The new switcher input number (1-based)
      */
-    void onExtronInputChange(int input);
+    void onSwitcherInputChange(int input);
 
     /**
      * Send a raw command string to RetroTINK.
@@ -146,7 +185,8 @@ private:
     std::vector<TriggerMapping> _triggers;
     String _lastCommand;
 
-    // Power state tracking
+    // Power management
+    PowerManagementMode _powerMgmtMode;
     RT4KPowerState _powerState;
     String _serialLineBuffer;
 
@@ -163,7 +203,7 @@ private:
     static const unsigned long SVS_KEEPALIVE_DELAY_MS = 1000;
 
     /**
-     * Find the trigger mapping for a given Extron input.
+     * Find the trigger mapping for a given switcher input.
      * @param input The input number to look up
      * @return Pointer to the trigger, or nullptr if not found
      */

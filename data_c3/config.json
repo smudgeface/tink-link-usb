@@ -1,21 +1,21 @@
 {
     "switcher": {
         "type": "Extron SW VGA",
-        "uartId": 1,
-        "txPin": 43,
-        "rxPin": 44,
+        "uartId": 0,
+        "txPin": 21,
+        "rxPin": 20,
         "autoSwitch": true
     },
     "tink": {
-        "serialMode": "usb",
+        "serialMode": "uart",
         "powerManagementMode": "full",
-        "uartId": 2,
-        "txPin": 17,
-        "rxPin": 18
+        "uartId": 1,
+        "txPin": 7,
+        "rxPin": 6
     },
     "hardware": {
-        "ledPin": 21,
-        "ledColorOrder": "RGB"
+        "ledPin": 8,
+        "ledColorOrder": "GRB"
     },
     "avr": {
         "type": "Denon X4300H",
@@ -23,7 +23,7 @@
         "ip": "",
         "input": "GAME"
     },
-    "hostname": "tinklink",
+    "hostname": "tinklink-c3",
     "triggers": [
         {
             "input": 1,

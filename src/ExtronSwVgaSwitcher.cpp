@@ -1,14 +1,10 @@
-#include "ExtronSwVga.h"
+#include "ExtronSwVgaSwitcher.h"
+#include "SerialInterface.h"
+#include "UartSerial.h"
 #include "Logger.h"
-#include <HardwareSerial.h>
 
-// Use UART1 for Extron communication
-static HardwareSerial ExtronSerial(1);
-
-ExtronSwVga::ExtronSwVga(uint8_t txPin, uint8_t rxPin, uint32_t baud)
-    : _txPin(txPin)
-    , _rxPin(rxPin)
-    , _baud(baud)
+ExtronSwVgaSwitcher::ExtronSwVgaSwitcher()
+    : _serial(nullptr)
     , _currentInput(0)
     , _inputCallback(nullptr)
     , _autoSwitchEnabled(false)
@@ -20,43 +16,64 @@ ExtronSwVga::ExtronSwVga(uint8_t txPin, uint8_t rxPin, uint32_t baud)
     memset(_stableSigState, 0, sizeof(_stableSigState));
 }
 
-ExtronSwVga::~ExtronSwVga() {
+ExtronSwVgaSwitcher::~ExtronSwVgaSwitcher() {
     end();
 }
 
-bool ExtronSwVga::begin() {
-    // Configure UART1 with specified pins
-    ExtronSerial.begin(_baud, SERIAL_8N1, _rxPin, _txPin);
+void ExtronSwVgaSwitcher::configure(const JsonObject& config) {
+    // Read Extron-specific fields from JSON
+    uint8_t uartId = config["uartId"] | 1;
+    uint8_t txPin = config["txPin"] | 43;
+    uint8_t rxPin = config["rxPin"] | 44;
+    bool autoSwitch = config["autoSwitch"] | true;
 
-    LOG_INFO("Extron SW VGA initialized on TX:GPIO%d, RX:GPIO%d at %lu baud",
-             _txPin, _rxPin, _baud);
+    LOG_DEBUG("ExtronSwVgaSwitcher: Configuring (UART%d, TX=%d, RX=%d, autoSwitch=%d)",
+              uartId, txPin, rxPin, autoSwitch);
+
+    // Clean up existing serial
+    if (_serial) {
+        delete _serial;
+        _serial = nullptr;
+    }
+
+    // Create UartSerial at 9600 baud for Extron
+    _serial = new UartSerial(uartId, rxPin, txPin, 9600);
+    _autoSwitchEnabled = autoSwitch;
+}
+
+bool ExtronSwVgaSwitcher::begin() {
+    if (!_serial) {
+        LOG_ERROR("ExtronSwVgaSwitcher: Cannot begin - not configured");
+        return false;
+    }
+
+    if (!_serial->initTransport()) {
+        LOG_ERROR("ExtronSwVgaSwitcher: Failed to initialize serial");
+        return false;
+    }
+
+    LOG_INFO("ExtronSwVgaSwitcher: Initialized (autoSwitch=%d)", _autoSwitchEnabled);
     return true;
 }
 
-void ExtronSwVga::end() {
-    ExtronSerial.end();
+void ExtronSwVgaSwitcher::end() {
+    if (_serial) {
+        delete _serial;
+        _serial = nullptr;
+    }
 }
 
-void ExtronSwVga::update() {
-    // Read available data and process line by line
-    while (ExtronSerial.available()) {
-        int c = ExtronSerial.read();
-        if (c < 0) {
-            break;
-        }
+void ExtronSwVgaSwitcher::update() {
+    if (!_serial) {
+        return;
+    }
 
-        char ch = static_cast<char>(c);
-
-        if (ch == '\n') {
-            // End of line - process it
-            _lineBuffer.trim();
-            if (_lineBuffer.length() > 0) {
-                processLine(_lineBuffer);
-            }
-            _lineBuffer = "";
-        } else if (ch != '\r') {
-            // Accumulate characters (ignore CR)
-            _lineBuffer += ch;
+    // Read lines from serial and process them
+    String line;
+    while (_serial->readLine(line)) {
+        line.trim();
+        if (line.length() > 0) {
+            processLine(line);
         }
     }
 
@@ -64,7 +81,7 @@ void ExtronSwVga::update() {
     processAutoSwitch();
 }
 
-void ExtronSwVga::processLine(const String& line) {
+void ExtronSwVgaSwitcher::processLine(const String& line) {
     LOG_DEBUG("Extron RX: [%s]", line.c_str());
 
     // Store in recent messages buffer
@@ -88,14 +105,14 @@ void ExtronSwVga::processLine(const String& line) {
     }
 }
 
-bool ExtronSwVga::isInputMessage(const String& line) {
+bool ExtronSwVgaSwitcher::isInputMessage(const String& line) {
     // Input messages start with "In" and contain "All" or "Vid"
     // Examples: "In3 All", "In10 Vid", "In1 All"
     return line.startsWith("In") &&
            (line.indexOf("All") > 0 || line.indexOf("Vid") > 0);
 }
 
-int ExtronSwVga::parseInputNumber(const String& line) {
+int ExtronSwVgaSwitcher::parseInputNumber(const String& line) {
     // Input number is between "In" (pos 2) and first space
     // "In3 All" -> 3
     // "In10 Vid" -> 10
@@ -108,19 +125,20 @@ int ExtronSwVga::parseInputNumber(const String& line) {
     return numStr.toInt();
 }
 
-void ExtronSwVga::onInputChange(InputChangeCallback callback) {
+void ExtronSwVgaSwitcher::onInputChange(InputChangeCallback callback) {
     _inputCallback = callback;
 }
 
-void ExtronSwVga::sendCommand(const char* cmd) {
-    if (cmd) {
-        LOG_DEBUG("Extron TX: [%s]", cmd);
-        ExtronSerial.print(cmd);
-        ExtronSerial.print("\r\n");
+void ExtronSwVgaSwitcher::sendCommand(const char* cmd) {
+    if (!_serial || !cmd) {
+        return;
     }
+
+    LOG_DEBUG("Extron TX: [%s]", cmd);
+    _serial->sendData(String(cmd) + "\r\n");
 }
 
-std::vector<String> ExtronSwVga::getRecentMessages(int count) {
+std::vector<String> ExtronSwVgaSwitcher::getRecentMessages(int count) {
     std::vector<String> result;
     int start = _recentMessages.size() > count ? _recentMessages.size() - count : 0;
 
@@ -131,15 +149,15 @@ std::vector<String> ExtronSwVga::getRecentMessages(int count) {
     return result;
 }
 
-void ExtronSwVga::clearRecentMessages() {
+void ExtronSwVgaSwitcher::clearRecentMessages() {
     _recentMessages.clear();
 }
 
-bool ExtronSwVga::isSigMessage(const String& line) {
+bool ExtronSwVgaSwitcher::isSigMessage(const String& line) {
     return line.startsWith("Sig ");
 }
 
-void ExtronSwVga::parseSigMessage(const String& line) {
+void ExtronSwVgaSwitcher::parseSigMessage(const String& line) {
     // Parse "Sig 0 1 0 0" -> array of 0/1 values for each input
     int newState[MAX_SIG_INPUTS];
     int count = 0;
@@ -171,7 +189,7 @@ void ExtronSwVga::parseSigMessage(const String& line) {
     }
 }
 
-void ExtronSwVga::processAutoSwitch() {
+void ExtronSwVgaSwitcher::processAutoSwitch() {
     if (!_autoSwitchEnabled || _numSigInputs == 0 || _sigChangeTime == 0) return;
 
     // Check if pending signal state differs from stable

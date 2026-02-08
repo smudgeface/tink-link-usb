@@ -1,29 +1,58 @@
 #include "DenonAvr.h"
+#include "SerialInterface.h"
 #include "TelnetSerial.h"
 #include "Logger.h"
 #include <WiFi.h>
 
-DenonAvr::DenonAvr(TelnetSerial* serial)
-    : _serial(serial)
-    , _enabled(false)
+DenonAvr::DenonAvr()
+    : _serial(nullptr)
     , _siPending(false)
     , _siPendingTime(0)
 {
 }
 
-void DenonAvr::begin(const String& input, bool enabled) {
-    _input = input;
-    _enabled = enabled;
-
-    if (_enabled) {
-        LOG_INFO("DenonAvr: Initialized (input: %s, enabled)", _input.c_str());
-    } else {
-        LOG_INFO("DenonAvr: Initialized (disabled)");
+DenonAvr::~DenonAvr() {
+    if (_serial) {
+        delete _serial;
+        _serial = nullptr;
     }
 }
 
+void DenonAvr::configure(const JsonObject& config) {
+    _input = config["input"] | "GAME";
+    String ip = config["ip"] | "";
+
+    LOG_DEBUG("DenonAvr: Configuring (ip=%s, input=%s)", ip.c_str(), _input.c_str());
+
+    // Clean up existing serial
+    if (_serial) {
+        delete _serial;
+        _serial = nullptr;
+    }
+
+    // Create TelnetSerial if IP is provided
+    if (ip.length() > 0) {
+        _serial = new TelnetSerial(ip, 23);
+    }
+}
+
+bool DenonAvr::begin() {
+    if (!_serial) {
+        LOG_ERROR("DenonAvr: Cannot begin - not configured");
+        return false;
+    }
+
+    if (!_serial->initTransport()) {
+        LOG_ERROR("DenonAvr: Failed to initialize serial");
+        return false;
+    }
+
+    LOG_INFO("DenonAvr: Initialized (input: %s)", _input.c_str());
+    return true;
+}
+
 void DenonAvr::update() {
-    // Process SSDP discovery (runs regardless of _enabled)
+    // Process SSDP discovery
     if (_discovering) {
         processDiscoveryResponses();
         if (millis() - _discoveryStartTime >= DISCOVERY_TIMEOUT_MS) {
@@ -32,8 +61,6 @@ void DenonAvr::update() {
             LOG_INFO("DenonAvr: Discovery complete, found %d device(s)", _discoveredDevices.size());
         }
     }
-
-    if (!_enabled) return;
 
     // Check for pending SI command
     if (_siPending && (millis() - _siPendingTime >= SI_DELAY_MS)) {
@@ -48,11 +75,6 @@ void DenonAvr::update() {
 }
 
 void DenonAvr::onInputChange() {
-    if (!_enabled) {
-        LOG_DEBUG("DenonAvr: Input change ignored (disabled)");
-        return;
-    }
-
     // Send power on immediately
     sendCommand("PWON");
     LOG_INFO("DenonAvr: Input change - sent PWON, queuing SI%s", _input.c_str());
@@ -63,11 +85,6 @@ void DenonAvr::onInputChange() {
 }
 
 bool DenonAvr::sendRawCommand(const String& command) {
-    if (!_enabled) {
-        LOG_WARN("DenonAvr: Cannot send command (disabled)");
-        return false;
-    }
-
     return sendCommand(command);
 }
 
@@ -75,18 +92,6 @@ bool DenonAvr::isConnected() const {
     return _serial && _serial->isConnected();
 }
 
-void DenonAvr::configure(const String& ip, const String& input, bool enabled) {
-    _input = input;
-    _enabled = enabled;
-
-    // Reconfigure serial transport if IP changed
-    if (_serial) {
-        _serial->configure(ip, 23);
-    }
-
-    LOG_INFO("DenonAvr: Reconfigured (ip: %s, input: %s, enabled: %s)",
-             ip.c_str(), _input.c_str(), _enabled ? "yes" : "no");
-}
 
 bool DenonAvr::startDiscovery() {
     if (_discovering) {

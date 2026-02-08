@@ -1,10 +1,15 @@
 #include "RetroTink.h"
 #include "SerialInterface.h"
+#ifndef NO_USB_HOST
+#include "UsbHostSerial.h"
+#endif
+#include "UartSerial.h"
 #include "Logger.h"
 
-RetroTink::RetroTink(SerialInterface* serial)
-    : _serial(serial)
+RetroTink::RetroTink()
+    : _serial(nullptr)
     , _lastCommand("")
+    , _powerMgmtMode(PowerManagementMode::FULL)
     , _powerState(RT4KPowerState::UNKNOWN)
     , _pendingCommand("")
     , _bootWaitStart(0)
@@ -15,14 +20,73 @@ RetroTink::RetroTink(SerialInterface* serial)
 }
 
 RetroTink::~RetroTink() {
+    if (_serial) {
+        delete _serial;
+        _serial = nullptr;
+    }
 }
 
-void RetroTink::begin() {
-    if (_serial) {
-        LOG_INFO("RetroTink: Controller initialized (serial mode)");
+void RetroTink::configure(const JsonObject& config) {
+    // Read serial mode configuration
+    String serialMode = config["serialMode"] | "usb";
+
+    // Read power management mode
+    String pmMode = config["powerManagementMode"] | "full";
+    if (pmMode == "off") {
+        _powerMgmtMode = PowerManagementMode::OFF;
+        _powerState = RT4KPowerState::ON;  // Assume always on
+    } else if (pmMode == "simple") {
+        _powerMgmtMode = PowerManagementMode::SIMPLE;
+        _powerState = RT4KPowerState::UNKNOWN;
     } else {
-        LOG_INFO("RetroTink: Controller initialized (stub mode - no serial)");
+        _powerMgmtMode = PowerManagementMode::FULL;
+        _powerState = RT4KPowerState::UNKNOWN;
     }
+
+    LOG_DEBUG("RetroTink: Power management mode: %s", pmMode.c_str());
+
+    // Clean up existing serial
+    if (_serial) {
+        delete _serial;
+        _serial = nullptr;
+    }
+
+    // Create appropriate serial interface based on mode
+    if (serialMode == "uart") {
+        // UART mode - read UART configuration
+        uint8_t uartId = config["uartId"] | 2;
+        uint8_t txPin = config["txPin"] | 17;
+        uint8_t rxPin = config["rxPin"] | 18;
+
+        LOG_DEBUG("RetroTink: Configuring UART mode (UART%d, TX=%d, RX=%d)",
+                  uartId, txPin, rxPin);
+
+        // RetroTink uses 115200 baud
+        _serial = new UartSerial(uartId, rxPin, txPin, 115200);
+    } else {
+        // USB mode (default)
+#ifndef NO_USB_HOST
+        LOG_DEBUG("RetroTink: Configuring USB Host mode");
+        _serial = new UsbHostSerial();
+#else
+        LOG_ERROR("RetroTink: USB Host not available on this platform. Use serialMode=uart.");
+#endif
+    }
+}
+
+bool RetroTink::begin() {
+    if (!_serial) {
+        LOG_ERROR("RetroTink: Cannot begin - not configured");
+        return false;
+    }
+
+    if (!_serial->initTransport()) {
+        LOG_ERROR("RetroTink: Failed to initialize serial");
+        return false;
+    }
+
+    LOG_INFO("RetroTink: Controller initialized");
+    return true;
 }
 
 void RetroTink::update() {
@@ -43,7 +107,7 @@ void RetroTink::addTrigger(const TriggerMapping& trigger) {
 
     const char* modeStr = (trigger.mode == TriggerMapping::SVS) ? "SVS" : "Remote";
     LOG_DEBUG("RetroTink: Added trigger - input %d -> profile %d (%s)",
-              trigger.extronInput, trigger.profile, modeStr);
+              trigger.switcherInput, trigger.profile, modeStr);
 }
 
 void RetroTink::clearTriggers() {
@@ -51,7 +115,7 @@ void RetroTink::clearTriggers() {
     LOG_DEBUG("RetroTink: All triggers cleared");
 }
 
-void RetroTink::onExtronInputChange(int input) {
+void RetroTink::onSwitcherInputChange(int input) {
     const TriggerMapping* trigger = findTrigger(input);
 
     if (!trigger) {
@@ -60,6 +124,63 @@ void RetroTink::onExtronInputChange(int input) {
     }
 
     String command = generateCommand(*trigger);
+
+    // OFF mode: no power management, send immediately
+    if (_powerMgmtMode == PowerManagementMode::OFF) {
+        sendCommand(command);
+        LOG_INFO("RetroTink: Input %d triggered -> %s", input, command.c_str());
+
+        if (trigger->mode == TriggerMapping::SVS) {
+            _lastSvsInput = trigger->profile;
+            _svsKeepAliveTime = millis();
+            _svsKeepAlivePending = true;
+        }
+        return;
+    }
+
+    // SIMPLE mode: first time sends "pwr on" + waits 15s, then always immediate
+    if (_powerMgmtMode == PowerManagementMode::SIMPLE) {
+        if (_powerState == RT4KPowerState::UNKNOWN) {
+            // First input change - send pwr on and wait for boot
+            LOG_INFO("RetroTink: First input change (simple mode) - sending pwr on and waiting %lu ms",
+                     BOOT_TIMEOUT_MS);
+            sendCommand("pwr on");
+            _powerState = RT4KPowerState::BOOTING;
+            _pendingCommand = command;
+            _bootWaitStart = millis();
+
+            if (trigger->mode == TriggerMapping::SVS) {
+                _lastSvsInput = trigger->profile;
+                _svsKeepAlivePending = false;
+            }
+
+            LOG_INFO("RetroTink: Queued command for after boot: %s", command.c_str());
+            return;
+        }
+
+        // Already ON (or BOOTING with another pending) - send immediately
+        if (_powerState == RT4KPowerState::ON) {
+            sendCommand(command);
+            LOG_INFO("RetroTink: Input %d triggered -> %s", input, command.c_str());
+
+            if (trigger->mode == TriggerMapping::SVS) {
+                _lastSvsInput = trigger->profile;
+                _svsKeepAliveTime = millis();
+                _svsKeepAlivePending = true;
+            }
+        } else if (_powerState == RT4KPowerState::BOOTING) {
+            // Still waiting for initial boot - replace pending command
+            _pendingCommand = command;
+            if (trigger->mode == TriggerMapping::SVS) {
+                _lastSvsInput = trigger->profile;
+                _svsKeepAlivePending = false;
+            }
+            LOG_INFO("RetroTink: Updated pending command: %s", command.c_str());
+        }
+        return;
+    }
+
+    // FULL mode: complete power state tracking via serial messages
 
     // Check if RT4K needs to be woken up
     if (_serial && _powerState == RT4KPowerState::SLEEPING) {
@@ -82,8 +203,6 @@ void RetroTink::onExtronInputChange(int input) {
 
     if (_serial && _powerState == RT4KPowerState::UNKNOWN) {
         // Unknown state - send pwr on and wait briefly to see if RT4K responds.
-        // If RT4K was off, we'll get "[MCU] Powering Up" within ~1s -> transition to BOOTING.
-        // If RT4K was already on, no response arrives -> after 3s timeout, assume ON and send command.
         LOG_INFO("RetroTink: RT4K state unknown - sending pwr on and waiting for response");
         sendCommand("pwr on");
         _powerState = RT4KPowerState::WAKING;
@@ -135,7 +254,7 @@ const char* RetroTink::getPowerStateString() const {
 
 const TriggerMapping* RetroTink::findTrigger(int input) const {
     for (const auto& trigger : _triggers) {
-        if (trigger.extronInput == input) {
+        if (trigger.switcherInput == input) {
             return &trigger;
         }
     }
@@ -293,7 +412,10 @@ void RetroTink::processPendingOperations() {
             }
 
             _bootWaitStart = 0;
-            _powerState = RT4KPowerState::UNKNOWN;
+            // SIMPLE mode: assume ON after boot timeout (no serial feedback expected)
+            // FULL mode: reset to UNKNOWN since we didn't get boot complete message
+            _powerState = (_powerMgmtMode == PowerManagementMode::SIMPLE)
+                ? RT4KPowerState::ON : RT4KPowerState::UNKNOWN;
         }
     }
 

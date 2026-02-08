@@ -1,25 +1,14 @@
 #include "TelnetSerial.h"
 #include "Logger.h"
 
-TelnetSerial::TelnetSerial()
-    : _port(23)
+TelnetSerial::TelnetSerial(const String& ip, uint16_t port)
+    : _ip(ip), _port(port)
 {
-}
-
-void TelnetSerial::begin(const String& ip, uint16_t port) {
-    _ip = ip;
-    _port = port;
     LOG_DEBUG("TelnetSerial: Configured for %s:%d", _ip.c_str(), _port);
 }
 
-void TelnetSerial::configure(const String& ip, uint16_t port) {
-    if (ip != _ip || port != _port) {
-        LOG_DEBUG("TelnetSerial: Reconfiguring from %s:%d to %s:%d",
-                  _ip.c_str(), _port, ip.c_str(), port);
-        disconnect();
-        _ip = ip;
-        _port = port;
-    }
+bool TelnetSerial::initTransport() {
+    return true;  // Connection is lazy (happens on first sendData)
 }
 
 void TelnetSerial::update() {

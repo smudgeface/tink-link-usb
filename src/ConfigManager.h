@@ -34,30 +34,13 @@ public:
         String hostname;   ///< mDNS hostname (default: "tinklink")
     };
 
-    /**
-     * Video switcher UART pin configuration.
-     */
-    struct SwitcherConfig {
-        String type;    ///< Switcher type (e.g., "Extron SW VGA")
-        uint8_t txPin;  ///< UART TX pin (default: GPIO43)
-        uint8_t rxPin;  ///< UART RX pin (default: GPIO44)
-    };
-
-    /**
-     * AVR receiver configuration.
-     */
-    struct AvrConfig {
-        String type;      ///< AVR type (e.g., "Denon X4300H")
-        bool enabled;     ///< Whether AVR control is active
-        String ip;        ///< AVR IP address
-        String input;     ///< Input source (e.g., "GAME", "SAT/CBL")
-    };
 
     /**
      * Hardware pin configuration.
      */
     struct HardwareConfig {
-        uint8_t ledPin;  ///< WS2812 RGB LED pin (default: GPIO21)
+        uint8_t ledPin;        ///< WS2812 LED data pin (default: GPIO21)
+        String ledColorOrder;  ///< LED color order: "RGB" or "GRB" (default: "GRB")
     };
 
     ConfigManager();
@@ -96,14 +79,23 @@ public:
     /** @return Current WiFi configuration */
     const WifiConfig& getWifiConfig() const { return _wifiConfig; }
 
-    /** @return Current switcher pin configuration */
-    const SwitcherConfig& getSwitcherConfig() const { return _switcherConfig; }
-
     /** @return Current hardware pin configuration */
     const HardwareConfig& getHardwareConfig() const { return _hardwareConfig; }
 
-    /** @return Current AVR configuration */
-    const AvrConfig& getAvrConfig() const { return _avrConfig; }
+    /** @return Switcher type name */
+    const String& getSwitcherType() const { return _switcherType; }
+
+    /** @return Switcher configuration as JSON object */
+    JsonObject getSwitcherConfig();
+
+    /** @return AVR configuration as JSON object */
+    JsonObject getAvrConfig();
+
+    /** @return true if AVR control is enabled */
+    bool isAvrEnabled() const;
+
+    /** @return RetroTink configuration as JSON object */
+    JsonObject getRetroTinkConfig();
 
     /** @return List of configured switcher input to RetroTINK profile triggers */
     const std::vector<TriggerMapping>& getTriggers() const { return _triggers; }
@@ -129,9 +121,9 @@ public:
 
     /**
      * Set AVR configuration (not saved until saveConfig() called).
-     * @param config AVR configuration
+     * @param config AVR configuration as JSON object
      */
-    void setAvrConfig(const AvrConfig& config);
+    void setAvrConfig(const JsonObject& config);
 
     /**
      * Check if WiFi credentials have been configured.
@@ -141,10 +133,14 @@ public:
 
 private:
     WifiConfig _wifiConfig;
-    SwitcherConfig _switcherConfig;
     HardwareConfig _hardwareConfig;
-    AvrConfig _avrConfig;
     std::vector<TriggerMapping> _triggers;
+
+    // Raw JSON storage for device configurations
+    String _switcherType;
+    JsonDocument _switcherConfigDoc;
+    JsonDocument _avrConfigDoc;
+    JsonDocument _retrotinkConfigDoc;
 
     bool loadDefaultConfig();
     TriggerMapping::Mode parseProfileMode(const char* mode);

@@ -1,7 +1,7 @@
 #include "WebServer.h"
 #include "WifiManager.h"
 #include "ConfigManager.h"
-#include "ExtronSwVga.h"
+#include "Switcher.h"
 #include "RetroTink.h"
 #include "DenonAvr.h"
 #include "Logger.h"
@@ -14,7 +14,7 @@ WebServer::WebServer(uint16_t port)
     : _server(new AsyncWebServer(port))
     , _wifi(nullptr)
     , _config(nullptr)
-    , _extron(nullptr)
+    , _switcher(nullptr)
     , _tink(nullptr)
     , _avr(nullptr)
     , _otaMode(OTAMode::FIRMWARE)
@@ -29,10 +29,10 @@ WebServer::~WebServer() {
     delete _server;
 }
 
-void WebServer::begin(WifiManager* wifi, ConfigManager* config, ExtronSwVga* extron, RetroTink* tink, DenonAvr* avr) {
+void WebServer::begin(WifiManager* wifi, ConfigManager* config, Switcher* switcher, RetroTink* tink, DenonAvr* avr) {
     _wifi = wifi;
     _config = config;
-    _extron = extron;
+    _switcher = switcher;
     _tink = tink;
     _avr = avr;
 
@@ -171,8 +171,8 @@ void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
     }
 
     // Switcher status
-    doc["switcher"]["type"] = _extron->getTypeName();
-    doc["switcher"]["currentInput"] = _extron->getCurrentInput();
+    doc["switcher"]["type"] = _switcher->getTypeName();
+    doc["switcher"]["currentInput"] = _switcher->getCurrentInput();
 
     // RetroTINK status
     doc["tink"]["connected"] = _tink->isConnected();
@@ -182,20 +182,22 @@ void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
     // AVR status
     if (_avr) {
         auto avrConfig = _config->getAvrConfig();
-        doc["avr"]["type"] = avrConfig.type;
-        doc["avr"]["enabled"] = _avr->isEnabled();
+        doc["avr"]["type"] = avrConfig["type"] | "Denon X4300H";
+        doc["avr"]["enabled"] = true;  // AVR exists, so it's enabled
         doc["avr"]["connected"] = _avr->isConnected();
-        doc["avr"]["ip"] = avrConfig.ip;
+        doc["avr"]["ip"] = avrConfig["ip"] | "";
         doc["avr"]["input"] = _avr->getInput();
         doc["avr"]["lastCommand"] = _avr->getLastCommand();
         doc["avr"]["lastResponse"] = _avr->getLastResponse();
+    } else {
+        doc["avr"]["enabled"] = false;
     }
 
     // Triggers
     JsonArray triggersArray = doc["triggers"].to<JsonArray>();
     for (const auto& trigger : _config->getTriggers()) {
         JsonObject triggerObj = triggersArray.add<JsonObject>();
-        triggerObj["input"] = trigger.extronInput;
+        triggerObj["input"] = trigger.switcherInput;
         triggerObj["profile"] = trigger.profile;
         triggerObj["mode"] = trigger.mode == TriggerMapping::SVS ? "SVS" : "Remote";
         triggerObj["name"] = trigger.name;
@@ -321,14 +323,14 @@ void WebServer::handleApiConfigTriggers(AsyncWebServerRequest* request) {
     std::vector<TriggerMapping> triggers;
     for (JsonObject triggerObj : doc.as<JsonArray>()) {
         TriggerMapping trigger;
-        trigger.extronInput = triggerObj["input"] | 0;
+        trigger.switcherInput = triggerObj["input"] | 0;
         trigger.profile = triggerObj["profile"] | 0;
         trigger.name = triggerObj["name"] | "";
 
         String mode = triggerObj["mode"] | "SVS";
         trigger.mode = (mode == "Remote") ? TriggerMapping::REMOTE : TriggerMapping::SVS;
 
-        if (trigger.extronInput > 0 && trigger.profile > 0) {
+        if (trigger.switcherInput > 0 && trigger.profile > 0) {
             triggers.push_back(trigger);
         }
     }
@@ -459,7 +461,7 @@ void WebServer::handleApiSwitcherSend(AsyncWebServerRequest* request) {
     LOG_DEBUG("WebServer: Sending switcher message: [%s]", message.c_str());
 
     // Send via switcher UART
-    _extron->sendCommand(message.c_str());
+    _switcher->sendCommand(message.c_str());
 
     // Return success response
     JsonDocument doc;
@@ -482,11 +484,11 @@ void WebServer::handleApiSwitcherReceive(AsyncWebServerRequest* request) {
 
     // Check if clear parameter is present
     if (request->hasParam("clear")) {
-        _extron->clearRecentMessages();
+        _switcher->clearRecentMessages();
     }
 
     // Get recent messages
-    std::vector<String> messages = _extron->getRecentMessages(count);
+    std::vector<String> messages = _switcher->getRecentMessages(count);
 
     // Build JSON response
     JsonDocument doc;
@@ -658,7 +660,7 @@ void WebServer::handleApiAvrSend(AsyncWebServerRequest* request) {
         return;
     }
 
-    if (!_avr->isEnabled()) {
+    if (!_avr) {
         request->send(400, "application/json", "{\"error\":\"AVR control is disabled\"}");
         return;
     }
@@ -716,10 +718,10 @@ void WebServer::handleApiConfigAvrGet(AsyncWebServerRequest* request) {
     auto avrConfig = _config->getAvrConfig();
 
     JsonDocument doc;
-    doc["type"] = avrConfig.type;
-    doc["enabled"] = avrConfig.enabled;
-    doc["ip"] = avrConfig.ip;
-    doc["input"] = avrConfig.input;
+    doc["type"] = avrConfig["type"] | "Denon X4300H";
+    doc["enabled"] = avrConfig["enabled"] | false;
+    doc["ip"] = avrConfig["ip"] | "";
+    doc["input"] = avrConfig["input"] | "GAME";
 
     String response;
     serializeJson(doc, response);
@@ -727,29 +729,43 @@ void WebServer::handleApiConfigAvrGet(AsyncWebServerRequest* request) {
 }
 
 void WebServer::handleApiConfigAvr(AsyncWebServerRequest* request) {
+    // Build new config from request params
+    JsonDocument newConfigDoc;
     auto avrConfig = _config->getAvrConfig();
 
+    // Start with existing values
+    newConfigDoc["type"] = avrConfig["type"] | "Denon X4300H";
+    newConfigDoc["enabled"] = avrConfig["enabled"] | false;
+    newConfigDoc["ip"] = avrConfig["ip"] | "";
+    newConfigDoc["input"] = avrConfig["input"] | "GAME";
+
+    // Update with request params
     if (request->hasParam("enabled", true)) {
         String val = request->getParam("enabled", true)->value();
-        avrConfig.enabled = (val == "true" || val == "1");
+        newConfigDoc["enabled"] = (val == "true" || val == "1");
     }
     if (request->hasParam("ip", true)) {
-        avrConfig.ip = request->getParam("ip", true)->value();
+        newConfigDoc["ip"] = request->getParam("ip", true)->value();
     }
     if (request->hasParam("input", true)) {
-        avrConfig.input = request->getParam("input", true)->value();
+        newConfigDoc["input"] = request->getParam("input", true)->value();
     }
 
-    _config->setAvrConfig(avrConfig);
+    JsonObject newConfig = newConfigDoc.as<JsonObject>();
+    _config->setAvrConfig(newConfig);
+
     if (_config->saveConfig()) {
         // Reconfigure live instance
         if (_avr) {
-            _avr->configure(avrConfig.ip, avrConfig.input, avrConfig.enabled);
+            _avr->configure(newConfig);
+            _avr->begin();
         }
 
         request->send(200, "application/json", "{\"status\":\"ok\"}");
         LOG_INFO("WebServer: AVR config saved (enabled: %s, ip: %s, input: %s)",
-                 avrConfig.enabled ? "yes" : "no", avrConfig.ip.c_str(), avrConfig.input.c_str());
+                 newConfig["enabled"].as<bool>() ? "yes" : "no",
+                 newConfig["ip"].as<const char*>(),
+                 newConfig["input"].as<const char*>());
     } else {
         request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
     }

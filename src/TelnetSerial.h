@@ -19,25 +19,15 @@
  */
 class TelnetSerial : public SerialInterface {
 public:
-    TelnetSerial();
-
     /**
-     * Initialize with target IP and port.
-     * Does not connect immediately; connection is made on first sendData().
+     * Create telnet serial transport.
      * @param ip Target IP address
      * @param port Target port (default 23 for telnet)
      */
-    void begin(const String& ip, uint16_t port = 23);
-
-    /**
-     * Reconfigure target IP and port.
-     * Disconnects existing connection if IP changed.
-     * @param ip New target IP address
-     * @param port New target port
-     */
-    void configure(const String& ip, uint16_t port = 23);
+    TelnetSerial(const String& ip, uint16_t port = 23);
 
     // SerialInterface overrides
+    bool initTransport() override;
     void update() override;
     bool isConnected() const override;
     bool sendData(const String& data) override;

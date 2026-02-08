@@ -2,10 +2,11 @@
 #define DENON_AVR_H
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <WiFiUdp.h>
 #include <vector>
 
-class TelnetSerial;
+class SerialInterface;
 
 /**
  * AVR discovered via SSDP on the local network.
@@ -33,9 +34,9 @@ struct DiscoveredAvr {
  * 2. After 1 second delay, sends "SI<input>\r" (e.g., "SIGAME\r")
  *
  * Usage:
- *   TelnetSerial serial;
- *   DenonAvr avr(&serial);
- *   avr.begin("GAME", true);
+ *   DenonAvr avr;
+ *   avr.configure(config);  // Reads ip, input from JSON
+ *   avr.begin();
  *   // On input change:
  *   avr.onInputChange();
  *   // In loop():
@@ -45,16 +46,25 @@ class DenonAvr {
 public:
     /**
      * Create Denon AVR controller.
-     * @param serial TelnetSerial instance for TCP communication
+     * Call configure() to set up connection and input source.
      */
-    explicit DenonAvr(TelnetSerial* serial);
+    DenonAvr();
+
+    ~DenonAvr();
 
     /**
-     * Initialize with input source and enabled state.
-     * @param input Denon input source name (e.g., "GAME", "SAT/CBL")
-     * @param enabled Whether AVR control is active
+     * Configure the AVR from JSON settings.
+     * Reads ip, input fields and creates TelnetSerial transport.
+     * @param config JSON object containing AVR configuration
      */
-    void begin(const String& input, bool enabled);
+    void configure(const JsonObject& config);
+
+    /**
+     * Initialize the AVR and its transport.
+     * Must be called after configure() and before update().
+     * @return true on success
+     */
+    bool begin();
 
     /**
      * Process pending commands and read responses.
@@ -79,9 +89,6 @@ public:
     /** @return true if TCP connection to AVR is active */
     bool isConnected() const;
 
-    /** @return true if AVR control is enabled */
-    bool isEnabled() const { return _enabled; }
-
     /** @return Configured input source name */
     String getInput() const { return _input; }
 
@@ -90,15 +97,6 @@ public:
 
     /** @return Last response received from AVR */
     String getLastResponse() const { return _lastResponse; }
-
-    /**
-     * Reconfigure AVR settings at runtime.
-     * Updates serial IP/port if changed.
-     * @param ip AVR IP address
-     * @param input Denon input source name
-     * @param enabled Whether AVR control is active
-     */
-    void configure(const String& ip, const String& input, bool enabled);
 
     /**
      * Start SSDP discovery for Denon/Marantz AVRs on the local network.
@@ -120,9 +118,8 @@ public:
     std::vector<DiscoveredAvr> getDiscoveryResults() const;
 
 private:
-    TelnetSerial* _serial;
+    SerialInterface* _serial;
     String _input;
-    bool _enabled;
     String _lastCommand;
     String _lastResponse;
 

@@ -1,10 +1,9 @@
 #include <Arduino.h>
 #include <FastLED.h>
 #include "ConfigManager.h"
-#include "ExtronSwVga.h"
-#include "UsbHostSerial.h"
+#include "Switcher.h"
+#include "SwitcherFactory.h"
 #include "RetroTink.h"
-#include "TelnetSerial.h"
 #include "DenonAvr.h"
 #include "WifiManager.h"
 #include "WebServer.h"
@@ -22,10 +21,8 @@ uint8_t ledPin = 21;  // Default for Waveshare ESP32-S3-Zero
 
 // Global instances
 ConfigManager configManager;
-UsbHostSerial usbHost;
-ExtronSwVga* extron = nullptr;
+Switcher* switcher = nullptr;
 RetroTink* tink = nullptr;
-TelnetSerial* avrSerial = nullptr;
 DenonAvr* avr = nullptr;
 WifiManager wifiManager;
 WebServer webServer;
@@ -93,34 +90,39 @@ void setup() {
     LOG_RAW("\n");
 
     // Initialize configuration manager (LittleFS) - load before hardware init
-    LOG_INFO("[1/7] Initializing configuration...");
+    LOG_INFO("[1/6] Initializing configuration...");
     if (!configManager.begin()) {
         LOG_ERROR("Failed to initialize configuration manager!");
     }
 
-    // Get pin configurations
-    auto switcherConfig = configManager.getSwitcherConfig();
+    // Get configurations
     auto hardwareConfig = configManager.getHardwareConfig();
     auto wifiConfig = configManager.getWifiConfig();
 
     // Store LED pin from config
     ledPin = hardwareConfig.ledPin;
+    String ledColorOrder = hardwareConfig.ledColorOrder;
 
-    // Initialize WS2812 RGB LED using configured pin
-    // Note: This board uses RGB color order, not the more common GRB
-    // FastLED requires compile-time pin for template, so we use switch/case
-    switch (ledPin) {
-        case 21:
-            FastLED.addLeds<WS2812, 21, RGB>(leds, NUM_LEDS);
-            break;
-        case 48:
-            FastLED.addLeds<WS2812, 48, RGB>(leds, NUM_LEDS);
-            break;
-        default:
-            LOG_WARN("LED pin %d not supported by FastLED template. Using GPIO21.", ledPin);
-            FastLED.addLeds<WS2812, 21, RGB>(leds, NUM_LEDS);
-            ledPin = 21;
-            break;
+    // Initialize WS2812 LED using configured pin and color order.
+    // FastLED requires compile-time constants for both pin and color order,
+    // so we enumerate supported combinations. Add new pins as needed.
+    if (ledColorOrder == "RGB") {
+        switch (ledPin) {
+            case 8:  FastLED.addLeds<WS2812, 8, RGB>(leds, NUM_LEDS); break;
+            case 21: FastLED.addLeds<WS2812, 21, RGB>(leds, NUM_LEDS); break;
+            default:
+                LOG_ERROR("LED pin %d not supported. Add it to the FastLED switch in main.cpp.", ledPin);
+                break;
+        }
+    } else {
+        // Default to GRB (most common WS2812 order)
+        switch (ledPin) {
+            case 8:  FastLED.addLeds<WS2812, 8, GRB>(leds, NUM_LEDS); break;
+            case 21: FastLED.addLeds<WS2812, 21, GRB>(leds, NUM_LEDS); break;
+            default:
+                LOG_ERROR("LED pin %d not supported. Add it to the FastLED switch in main.cpp.", ledPin);
+                break;
+        }
     }
     FastLED.setBrightness(50);  // 0-255, moderate brightness
     leds[0] = CRGB::Black;
@@ -151,13 +153,10 @@ void setup() {
     leds[0] = CRGB::Black;
     FastLED.show();
 
-    // Initialize USB Host for RetroTINK communication
-    LOG_INFO("[2/7] Initializing USB Host...");
-    usbHost.begin();
-
-    // Initialize RetroTINK controller with USB Host
-    LOG_INFO("[3/7] Initializing RetroTINK controller...");
-    tink = new RetroTink(&usbHost);
+    // Initialize RetroTINK controller
+    LOG_INFO("[2/6] Initializing RetroTINK controller...");
+    tink = new RetroTink();
+    tink->configure(configManager.getRetroTinkConfig());
     tink->begin();
 
     // Load triggers from config
@@ -165,33 +164,38 @@ void setup() {
         tink->addTrigger(trigger);
     }
 
-    // Initialize AVR controller
-    LOG_INFO("[4/7] Initializing AVR controller...");
-    auto avrConfig = configManager.getAvrConfig();
-    avrSerial = new TelnetSerial();
-    avrSerial->begin(avrConfig.ip, 23);
-    avr = new DenonAvr(avrSerial);
-    avr->begin(avrConfig.input, avrConfig.enabled);
-
-    // Initialize video switcher
-    LOG_INFO("[5/7] Initializing %s...", switcherConfig.type.c_str());
-    extron = new ExtronSwVga(switcherConfig.txPin, switcherConfig.rxPin, 9600);
-    if (!extron->begin()) {
-        LOG_ERROR("Failed to initialize Extron handler!");
+    // Initialize AVR controller if enabled
+    LOG_INFO("[3/6] Initializing AVR controller...");
+    if (configManager.isAvrEnabled()) {
+        avr = new DenonAvr();
+        avr->configure(configManager.getAvrConfig());
+        avr->begin();
+    } else {
+        LOG_INFO("AVR control disabled");
     }
 
-    // Enable signal-based auto-switching
-    extron->setAutoSwitchEnabled(true);
+    // Initialize video switcher
+    auto switcherType = configManager.getSwitcherType();
+    LOG_INFO("[4/6] Initializing %s...", switcherType.c_str());
+    switcher = SwitcherFactory::create(switcherType);
+    if (switcher) {
+        switcher->configure(configManager.getSwitcherConfig());
+        if (!switcher->begin()) {
+            LOG_ERROR("Failed to initialize switcher!");
+        }
 
-    // Connect Extron input changes to RetroTINK and AVR
-    extron->onInputChange([](int input) {
-        LOG_INFO("Input change detected: %d", input);
-        tink->onExtronInputChange(input);
-        avr->onInputChange();
-    });
+        // Connect switcher input changes to RetroTINK and AVR
+        switcher->onInputChange([](int input) {
+            LOG_INFO("Input change detected: %d", input);
+            tink->onSwitcherInputChange(input);
+            if (avr) avr->onInputChange();
+        });
+    } else {
+        LOG_ERROR("Unknown switcher type: %s", switcherType.c_str());
+    }
 
     // Initialize WiFi manager
-    LOG_INFO("[6/7] Initializing WiFi...");
+    LOG_INFO("[5/6] Initializing WiFi...");
     wifiManager.begin(wifiConfig.hostname);
 
     // Set up WiFi state change callback
@@ -226,8 +230,8 @@ void setup() {
     }
 
     // Initialize web server
-    LOG_INFO("[7/7] Starting web server...");
-    webServer.begin(&wifiManager, &configManager, extron, tink, avr);
+    LOG_INFO("[6/6] Starting web server...");
+    webServer.begin(&wifiManager, &configManager, switcher, tink, avr);
     webServer.setLEDCallback(setLEDColor);
 
     LOG_RAW("\n");
@@ -236,16 +240,27 @@ void setup() {
     LOG_RAW("========================================\n");
     LOG_RAW("\n");
     LOG_INFO("Pin assignments:");
-    LOG_INFO("  Switcher TX:  GPIO%d", switcherConfig.txPin);
-    LOG_INFO("  Switcher RX:  GPIO%d", switcherConfig.rxPin);
+    if (switcher) {
+        auto switcherConfig = configManager.getSwitcherConfig();
+        LOG_INFO("  Switcher TX:  GPIO%d", switcherConfig["txPin"] | 43);
+        LOG_INFO("  Switcher RX:  GPIO%d", switcherConfig["rxPin"] | 44);
+    }
+    auto tinkConfig = configManager.getRetroTinkConfig();
+    String tinkMode = tinkConfig["serialMode"] | "usb";
+    if (tinkMode == "uart") {
+        LOG_INFO("  Tink TX:      GPIO%d", tinkConfig["txPin"] | 17);
+        LOG_INFO("  Tink RX:      GPIO%d", tinkConfig["rxPin"] | 18);
+    } else {
+        LOG_INFO("  USB Host:     GPIO19 (D-) / GPIO20 (D+)");
+    }
     LOG_INFO("  RGB LED:      GPIO%d", ledPin);
-    LOG_INFO("  USB Host:     GPIO19 (D-) / GPIO20 (D+)");
-    LOG_INFO("USB Mode: OTG (USB Host for RetroTINK 4K)");
+    LOG_INFO("RetroTINK serial: %s", tinkMode.c_str());
     LOG_INFO("Serial debugging: disabled (use web console or scripts/logs.py)");
     if (wifiManager.isAPActive()) {
         LOG_INFO("Web interface: http://%s", wifiManager.getIP().c_str());
     } else {
-        LOG_INFO("Web interface: http://tinklink.local");
+        String hostname = configManager.getWifiConfig().hostname;
+        LOG_INFO("Web interface: http://%s.local", hostname.c_str());
     }
 }
 
@@ -253,14 +268,14 @@ void loop() {
     // Update WiFi connection state
     wifiManager.update();
 
-    // Process incoming Extron messages
-    extron->update();
+    // Process incoming switcher messages
+    if (switcher) switcher->update();
 
     // Process USB Host events and RT4K communication
     tink->update();
 
     // Process AVR commands and responses
-    avr->update();
+    if (avr) avr->update();
 
     // Check for manual LED mode timeout
     unsigned long now = millis();

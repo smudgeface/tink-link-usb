@@ -1,4 +1,7 @@
 #include "UsbHostSerial.h"
+
+#ifndef NO_USB_HOST
+
 #include "Logger.h"
 
 UsbHostSerial::UsbHostSerial()
@@ -13,10 +16,13 @@ UsbHostSerial::UsbHostSerial()
 UsbHostSerial::~UsbHostSerial() {
 }
 
-void UsbHostSerial::begin() {
+bool UsbHostSerial::initTransport() {
     LOG_INFO("UsbHostSerial: Initializing USB Host (FTDI @ 115200 baud)...");
+    // Call base class begin() which returns void
     EspUsbHostSerial_FTDI::begin(115200);
     LOG_INFO("UsbHostSerial: USB Host driver installed, waiting for device...");
+    // Always return true - initialization is considered successful if no exception thrown
+    return true;
 }
 
 void UsbHostSerial::update() {
@@ -145,3 +151,5 @@ void UsbHostSerial::onReceive(const uint8_t* data, const size_t length) {
         rxBufferWrite(data[i]);
     }
 }
+
+#endif // NO_USB_HOST

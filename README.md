@@ -1,10 +1,10 @@
 # TinkLink-USB
 
-> **Current Version**: 1.8.0
+> **Current Version**: 1.9.0
 
-A USB-based ESP32-S3 bridge between video switchers and the RetroTINK 4K.
+An ESP32-based bridge between video switchers and the RetroTINK 4K.
 
-TinkLink-USB automatically triggers RetroTINK 4K profile changes when your video switcher changes inputs. This version uses **USB Host** to communicate directly with the RetroTINK 4K over its USB serial interface, eliminating the need for VGA cable serial connections and level shifters.
+TinkLink-USB automatically triggers RetroTINK 4K profile changes when your video switcher changes inputs. It communicates with the RetroTINK 4K over **USB Host** (ESP32-S3) or **UART serial** ([alternative boards](ALTERNATIVE_BOARDS.md)), and monitors your video switcher over RS-232.
 
 <img src="assets/hardware/IMG_6513.jpeg" width="500" alt="Completed tinklink USB device">
 
@@ -44,13 +44,11 @@ The original [TinkLink](https://github.com/Patrick-Working/tink-link) project us
 
 | Component | Notes |
 |-----------|-------|
-| **ESP32-S3 Dev Board** | USB Host requires ESP32-S3 (S3-DevKitC, ATOMS3, or StampS3). ESP32-C3 does NOT support USB Host. |
+| **ESP32-S3 Dev Board** | USB Host requires ESP32-S3 (S3-DevKitC, ATOMS3, or StampS3). See [Alternative Boards](ALTERNATIVE_BOARDS.md) for non-S3 options. |
 | **USB OTG Cable** | Type-C to Type-A with power support (18W+ recommended) |
 | **RetroTINK 4K** | USB serial interface enabled |
 | **Extron SW VGA** | Or compatible video switcher with RS-232 output |
 | **RS-232 Level Shifter** | MAX3232 or similar (for Extron connection only) |
-
-**Important:** The ESP32-C3 does NOT support USB Host. You must use an ESP32-S3 variant.
 
 ### ESP32-S3 Boards
 
@@ -456,55 +454,35 @@ If `pio device monitor` fails with a termios error, the serial port may be in us
 
 ```
 tink-link-usb/
-├── .gitignore
-├── LICENSE
 ├── README.md
+├── ALTERNATIVE_BOARDS.md      # Guide for ESP32-C3 and other boards
 ├── CLAUDE.md                  # AI assistant development guide
 ├── platformio.ini
 ├── assets/
 │   ├── docs/                  # Reference documentation
-│   │   └── HEOS_CLI_Protocol_Specification.pdf
-│   └── hardware/              # Hardware documentation and images
-│       ├── esp32-s3-zero.jpg          # ESP32-S3-Zero product photo
-│       ├── ESP32-S3-Zero-2D-size.jpg  # Board dimensions (2D drawing)
-│       ├── ESP32-S3-Zero-Sch.pdf      # Circuit schematic
-│       ├── ESP32-S3-Zero.stp          # 3D STEP CAD model
-│       ├── max3232-module.jpg         # MAX3232 RS232 converter
-│       ├── db9-to-3.5mm-adapter.jpg   # DB9 serial adapter
-│       └── IMG_6513.jpeg              # Completed device photo
+│   └── hardware/              # Hardware photos and pinout diagrams
 ├── scripts/
 │   ├── ota_upload.py          # OTA firmware/filesystem upload
-│   └── logs.py                # Remote log monitoring
+│   ├── logs.py                # Remote log monitoring
+│   └── c3_data_dir.py         # PlatformIO pre-script for ESP32-C3
 ├── src/
 │   ├── main.cpp               # Application entry point
 │   ├── version.h              # Semantic version defines
-│   ├── Logger.h               # Centralized logging system
-│   ├── Logger.cpp
-│   ├── UsbHostSerial.h        # USB Host FTDI serial driver
-│   ├── UsbHostSerial.cpp
 │   ├── SerialInterface.h      # Abstract serial interface
-│   ├── TelnetSerial.h         # TCP telnet serial transport
-│   ├── TelnetSerial.cpp
-│   ├── ExtronSwVga.h          # Extron switcher UART handler
-│   ├── ExtronSwVga.cpp
-│   ├── RetroTink.h            # RetroTINK 4K controller (USB Host)
-│   ├── RetroTink.cpp
-│   ├── DenonAvr.h             # Denon/Marantz AVR controller (telnet + SSDP)
-│   ├── DenonAvr.cpp
-│   ├── WifiManager.h          # WiFi STA/AP management
-│   ├── WifiManager.cpp
-│   ├── WebServer.h            # Async web server and API
-│   ├── WebServer.cpp
-│   ├── ConfigManager.h        # LittleFS configuration
-│   └── ConfigManager.cpp
-└── data/
-    ├── index.html             # Status page
-    ├── config.html            # WiFi and trigger configuration
-    ├── debug.html             # System console & OTA updates
-    ├── api.html               # REST API documentation
-    ├── style.css              # Global styles
-    ├── config.json            # Default configuration
-    └── wifi.json              # WiFi credentials template
+│   ├── UsbHostSerial.*        # USB Host FTDI serial driver (S3 only)
+│   ├── UartSerial.*           # Hardware UART serial driver
+│   ├── TelnetSerial.*         # TCP telnet serial transport
+│   ├── Switcher.h             # Abstract video switcher interface
+│   ├── SwitcherFactory.*      # Creates switcher by type string
+│   ├── ExtronSwVgaSwitcher.*  # Extron SW VGA switcher implementation
+│   ├── RetroTink.*            # RetroTINK 4K controller
+│   ├── DenonAvr.*             # Denon/Marantz AVR controller
+│   ├── WifiManager.*          # WiFi STA/AP management
+│   ├── WebServer.*            # Async web server and API
+│   ├── ConfigManager.*        # LittleFS configuration
+│   └── Logger.*               # Centralized logging system
+├── data/                      # Web interface + config (ESP32-S3)
+└── data_c3/                   # Web interface + config (ESP32-C3)
 ```
 
 ## Changelog

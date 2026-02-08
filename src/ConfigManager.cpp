@@ -4,19 +4,31 @@
 
 ConfigManager::ConfigManager() {
     // Default pin assignments for ESP32-S3-Zero (Waveshare)
-    // Switcher uses UART0 on GPIO43 (TX) / GPIO44 (RX)
-    _switcherConfig.type = "Extron SW VGA";
-    _switcherConfig.txPin = 43;
-    _switcherConfig.rxPin = 44;
+    // Switcher uses UART1 on GPIO43 (TX) / GPIO44 (RX)
+    _switcherType = "Extron SW VGA";
+    _switcherConfigDoc["type"] = "Extron SW VGA";
+    _switcherConfigDoc["uartId"] = 1;
+    _switcherConfigDoc["txPin"] = 43;
+    _switcherConfigDoc["rxPin"] = 44;
+    _switcherConfigDoc["autoSwitch"] = true;
 
     // Hardware pins
-    _hardwareConfig.ledPin = 21;  // WS2812 RGB LED
+    _hardwareConfig.ledPin = 21;          // WS2812 LED data pin
+    _hardwareConfig.ledColorOrder = "GRB"; // Most WS2812 LEDs use GRB
 
     // AVR defaults
-    _avrConfig.type = "Denon X4300H";
-    _avrConfig.enabled = false;
-    _avrConfig.ip = "";
-    _avrConfig.input = "GAME";
+    _avrConfigDoc["type"] = "Denon X4300H";
+    _avrConfigDoc["enabled"] = false;
+    _avrConfigDoc["ip"] = "";
+    _avrConfigDoc["input"] = "GAME";
+
+    // RetroTink defaults
+    // Default to USB mode with full power management
+    _retrotinkConfigDoc["serialMode"] = "usb";
+    _retrotinkConfigDoc["powerManagementMode"] = "full";
+    _retrotinkConfigDoc["uartId"] = 2;
+    _retrotinkConfigDoc["txPin"] = 17;
+    _retrotinkConfigDoc["rxPin"] = 18;
 
     _wifiConfig.hostname = "tinklink";
 }
@@ -52,24 +64,29 @@ bool ConfigManager::loadConfig() {
         return loadDefaultConfig();
     }
 
-    // Parse switcher config
+    // Parse switcher config (store raw JSON)
     if (doc["switcher"].is<JsonObject>()) {
-        _switcherConfig.type = doc["switcher"]["type"] | "Extron SW VGA";
-        _switcherConfig.txPin = doc["switcher"]["txPin"] | 43;
-        _switcherConfig.rxPin = doc["switcher"]["rxPin"] | 44;
+        _switcherType = doc["switcher"]["type"] | "Extron SW VGA";
+        _switcherConfigDoc.clear();
+        _switcherConfigDoc.set(doc["switcher"]);
     }
 
     // Parse hardware config
     if (doc["hardware"].is<JsonObject>()) {
         _hardwareConfig.ledPin = doc["hardware"]["ledPin"] | 21;
+        _hardwareConfig.ledColorOrder = doc["hardware"]["ledColorOrder"] | "GRB";
     }
 
-    // Parse AVR config
+    // Parse AVR config (store raw JSON)
     if (doc["avr"].is<JsonObject>()) {
-        _avrConfig.type = doc["avr"]["type"] | "Denon X4300H";
-        _avrConfig.enabled = doc["avr"]["enabled"] | false;
-        _avrConfig.ip = doc["avr"]["ip"] | "";
-        _avrConfig.input = doc["avr"]["input"] | "GAME";
+        _avrConfigDoc.clear();
+        _avrConfigDoc.set(doc["avr"]);
+    }
+
+    // Parse RetroTink config (store raw JSON)
+    if (doc["tink"].is<JsonObject>()) {
+        _retrotinkConfigDoc.clear();
+        _retrotinkConfigDoc.set(doc["tink"]);
     }
 
     // Parse hostname (from root or wirelessClient for backwards compatibility)
@@ -84,12 +101,12 @@ bool ConfigManager::loadConfig() {
     if (doc["triggers"].is<JsonArray>()) {
         for (JsonObject triggerObj : doc["triggers"].as<JsonArray>()) {
             TriggerMapping trigger;
-            trigger.extronInput = triggerObj["input"] | 0;
+            trigger.switcherInput = triggerObj["input"] | 0;
             trigger.profile = triggerObj["profile"] | 0;
             trigger.name = triggerObj["name"] | "";
             trigger.mode = parseProfileMode(triggerObj["mode"] | "SVS");
 
-            if (trigger.extronInput > 0 && trigger.profile > 0) {
+            if (trigger.switcherInput > 0 && trigger.profile > 0) {
                 _triggers.push_back(trigger);
             }
         }
@@ -104,10 +121,8 @@ bool ConfigManager::loadDefaultConfig() {
     _triggers.clear();
 
     // Add a couple of example triggers
-    TriggerMapping trigger1 = {1, TriggerMapping::SVS, 1, "Input 1"};
-    TriggerMapping trigger2 = {2, TriggerMapping::SVS, 2, "Input 2"};
-    _triggers.push_back(trigger1);
-    _triggers.push_back(trigger2);
+    _triggers.push_back({1, TriggerMapping::SVS, 1, "Input 1"});
+    _triggers.push_back({2, TriggerMapping::SVS, 2, "Input 2"});
 
     return true;
 }
@@ -115,19 +130,20 @@ bool ConfigManager::loadDefaultConfig() {
 bool ConfigManager::saveConfig() {
     JsonDocument doc;
 
-    // Switcher config
-    doc["switcher"]["type"] = _switcherConfig.type;
-    doc["switcher"]["txPin"] = _switcherConfig.txPin;
-    doc["switcher"]["rxPin"] = _switcherConfig.rxPin;
+    // Switcher config (write raw JSON)
+    doc["switcher"].set(_switcherConfigDoc);
 
     // Hardware config
     doc["hardware"]["ledPin"] = _hardwareConfig.ledPin;
+    doc["hardware"]["ledColorOrder"] = _hardwareConfig.ledColorOrder;
 
-    // AVR config
-    doc["avr"]["type"] = _avrConfig.type;
-    doc["avr"]["enabled"] = _avrConfig.enabled;
-    doc["avr"]["ip"] = _avrConfig.ip;
-    doc["avr"]["input"] = _avrConfig.input;
+    // AVR config (write raw JSON)
+    doc["avr"].set(_avrConfigDoc);
+
+    // RetroTink config (write raw JSON if not empty)
+    if (!_retrotinkConfigDoc.isNull()) {
+        doc["tink"].set(_retrotinkConfigDoc);
+    }
 
     // Hostname
     doc["hostname"] = _wifiConfig.hostname;
@@ -136,7 +152,7 @@ bool ConfigManager::saveConfig() {
     JsonArray triggersArray = doc["triggers"].to<JsonArray>();
     for (const auto& trigger : _triggers) {
         JsonObject triggerObj = triggersArray.add<JsonObject>();
-        triggerObj["input"] = trigger.extronInput;
+        triggerObj["input"] = trigger.switcherInput;
         triggerObj["mode"] = profileModeToString(trigger.mode);
         triggerObj["profile"] = trigger.profile;
         triggerObj["name"] = trigger.name;
@@ -216,8 +232,25 @@ void ConfigManager::setTriggers(const std::vector<TriggerMapping>& triggers) {
     _triggers = triggers;
 }
 
-void ConfigManager::setAvrConfig(const AvrConfig& config) {
-    _avrConfig = config;
+void ConfigManager::setAvrConfig(const JsonObject& config) {
+    _avrConfigDoc.clear();
+    _avrConfigDoc.set(config);
+}
+
+JsonObject ConfigManager::getSwitcherConfig() {
+    return _switcherConfigDoc.as<JsonObject>();
+}
+
+JsonObject ConfigManager::getAvrConfig() {
+    return _avrConfigDoc.as<JsonObject>();
+}
+
+bool ConfigManager::isAvrEnabled() const {
+    return _avrConfigDoc["enabled"] | false;
+}
+
+JsonObject ConfigManager::getRetroTinkConfig() {
+    return _retrotinkConfigDoc.as<JsonObject>();
 }
 
 bool ConfigManager::hasWifiCredentials() const {

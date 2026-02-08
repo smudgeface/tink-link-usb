@@ -17,6 +17,13 @@ class SerialInterface {
 public:
     virtual ~SerialInterface() = default;
 
+    /**
+     * Initialize the transport. Must be called before use.
+     * Named initTransport() to avoid conflicts with other begin() methods
+     * in classes using multiple inheritance.
+     */
+    virtual bool initTransport() = 0;
+
     /** Process transport events. Called each loop iteration. */
     virtual void update() = 0;
 

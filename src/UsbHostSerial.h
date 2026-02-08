@@ -1,6 +1,8 @@
 #ifndef USB_HOST_SERIAL_H
 #define USB_HOST_SERIAL_H
 
+#ifndef NO_USB_HOST
+
 #include <Arduino.h>
 #include <EspUsbHostSerial_FTDI.h>
 #include <functional>
@@ -44,10 +46,11 @@ public:
     ~UsbHostSerial();
 
     /**
-     * Initialize USB Host at 115200 baud for FTDI communication.
-     * Must be called in setup() before update().
+     * Initialize USB Host via EspUsbHost::begin() for FTDI communication at 115200 baud.
+     * Implements SerialInterface::initTransport().
+     * @return true on success
      */
-    void begin();
+    bool initTransport() override;
 
     /**
      * Process USB Host events. Must be called in loop().
@@ -158,4 +161,5 @@ private:
     bool rxBufferWrite(uint8_t byte);
 };
 
+#endif // NO_USB_HOST
 #endif // USB_HOST_SERIAL_H
