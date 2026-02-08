@@ -487,6 +487,16 @@ tink-link-usb/
 
 ## Changelog
 
+### v1.9.0 — Pluggable Switcher Architecture, ESP32-C3 Support & Power Management
+
+- **Pluggable switcher architecture** — Abstract `Switcher` base class with `SwitcherFactory`; renamed `ExtronSwVga` → `ExtronSwVgaSwitcher`; all Extron-specific naming generalized throughout codebase
+- **Serial transport refactoring** — New `UartSerial` class wrapping `HardwareSerial` with configurable UART number, TX/RX pins, and baud rate; each device class now owns its serial transport internally
+- **ConfigManager refactoring** — Replaced typed config structs with raw `JsonDocument` storage; new accessors (`getSwitcherType()`, `getSwitcherConfig()`, `getAvrConfig()`, `getRetroTinkConfig()`); new `"tink"` config section for RetroTINK serial and power settings
+- **RetroTINK power management** — Configurable `serialMode` (`"usb"` or `"uart"`) and `powerManagementMode` with three modes: `"off"` (commands sent immediately), `"simple"` (sends `pwr on` once then waits for boot), `"full"` (complete power state tracking via serial status messages)
+- **ESP32-C3 support** — New `[env:esp32c3]` PlatformIO environment; `NO_USB_HOST` build flag excludes USB Host code; separate `data_c3/` filesystem directory with C3-specific pin and UART config; pre-build script overrides data directory per environment
+- **LED configuration** — New `ledColorOrder` config field (`"RGB"` or `"GRB"`); runtime color order selection; added GPIO8 support for C3 boards
+- **Documentation** — New [ALTERNATIVE_BOARDS.md](ALTERNATIVE_BOARDS.md) guide covering ESP32-C3 Super Mini Plus wiring, configuration, and build instructions
+
 ### v1.8.0 — AVR Network Discovery
 
 - **SSDP Discovery** — "Discover" button on config page finds Denon/Marantz AVRs on the local network via UPnP multicast, fetches friendly names from device XML descriptions
