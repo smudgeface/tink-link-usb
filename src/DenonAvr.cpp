@@ -98,10 +98,19 @@ bool DenonAvr::startDiscovery() {
         return false;
     }
 
+    // SSDP discovery requires active WiFi connection (not just AP mode)
+    if (WiFi.status() != WL_CONNECTED) {
+        LOG_ERROR("DenonAvr: Cannot start discovery - WiFi not connected (status: %d)", WiFi.status());
+        return false;
+    }
+
     _discoveredDevices.clear();
 
-    if (!_discoveryUdp.beginMulticast(IPAddress(239, 255, 255, 250), 1900)) {
-        LOG_ERROR("DenonAvr: Failed to start UDP multicast");
+    // In AP_STA mode, we need to explicitly bind to the STA interface for multicast
+    // The WiFi.localIP() ensures we're using the STA interface, not the AP
+    IPAddress localIP = WiFi.localIP();
+    if (!_discoveryUdp.beginMulticast(localIP, IPAddress(239, 255, 255, 250), 1900)) {
+        LOG_ERROR("DenonAvr: Failed to start UDP multicast (local IP: %s)", localIP.toString().c_str());
         return false;
     }
 
