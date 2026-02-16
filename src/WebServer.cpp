@@ -144,6 +144,7 @@ void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
     doc["wifi"]["ssid"] = _wifi->getSSID();
     doc["wifi"]["ip"] = _wifi->getIP();
     doc["wifi"]["rssi"] = _wifi->getRSSI();
+    doc["wifi"]["hostname"] = WiFi.getHostname();
 
     const char* stateStr = "unknown";
     switch (_wifi->getState()) {
