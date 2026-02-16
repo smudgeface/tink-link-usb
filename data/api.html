@@ -688,6 +688,46 @@
   "message": "Rebooting..."
 }</div>
             </div>
+
+            <div class="api-section">
+                <div class="api-header">
+                    <span class="method get">GET</span>
+                    <span class="api-path">/api/config/backup</span>
+                    <button class="secondary try-btn" onclick="tryApi('GET', '/api/config/backup')">Try</button>
+                    <p class="api-desc">Download all device configuration (WiFi credentials, triggers, AVR settings) as a single JSON object. Use before filesystem OTA updates to preserve settings.</p>
+                </div>
+
+                <h4>Response</h4>
+                <div class="api-example">{
+  "config": {
+    "switcher": { "type": "Extron SW VGA" },
+    "avr": { "type": "Denon X4300H", "enabled": true, "ip": "192.168.1.100", "input": "GAME" },
+    "triggers": [ ... ]
+  },
+  "wifi": {
+    "ssid": "MyNetwork",
+    "password": "...",
+    "hostname": "tinklink"
+  }
+}</div>
+            </div>
+
+            <div class="api-section">
+                <div class="api-header">
+                    <span class="method post">POST</span>
+                    <span class="api-path">/api/config/restore</span>
+                    <p class="api-desc">Restore device configuration from a backup JSON object. Send the exact JSON returned by <code>/api/config/backup</code>. Reboot after to apply.</p>
+                </div>
+
+                <h4>Request Body</h4>
+                <p style="font-size: 0.9em; color: #888;">Content-Type: <code>application/json</code> — the JSON object from <code>/api/config/backup</code>.</p>
+
+                <h4>Response</h4>
+                <div class="api-example">{
+  "status": "ok",
+  "message": "Config restored. Reboot to apply."
+}</div>
+            </div>
         </div>
 
         <!-- Command Line Examples -->
@@ -761,6 +801,22 @@
                 <h4>Upload Firmware via OTA</h4>
                 <div class="api-example">curl -X POST http://tinklink.local/api/ota/upload \
      -F "file=@firmware.bin" -F "mode=firmware"</div>
+            </div>
+
+            <div class="api-section">
+                <h4>Backup Config</h4>
+                <div class="api-example">curl http://tinklink.local/api/config/backup -o config_backup.json</div>
+            </div>
+
+            <div class="api-section">
+                <h4>Restore Config</h4>
+                <div class="api-example">curl -X POST http://tinklink.local/api/config/restore \
+     -H "Content-Type: application/json" -d @config_backup.json</div>
+            </div>
+
+            <div class="api-section">
+                <h4>Reboot Device</h4>
+                <div class="api-example">curl -X POST http://tinklink.local/api/system/reboot</div>
             </div>
         </div>
 
