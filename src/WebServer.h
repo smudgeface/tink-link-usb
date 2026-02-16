@@ -94,6 +94,10 @@ private:
     bool _otaInProgress;
     String _otaError;
 
+    // Config restore state
+    String _restoreBody;
+    String _restoreError;
+
     /** Configure all HTTP routes and handlers. */
     void setupRoutes();
 
@@ -114,6 +118,11 @@ private:
     void handleApiAvrDiscover(AsyncWebServerRequest* request);
     void handleApiConfigAvr(AsyncWebServerRequest* request);
     void handleApiConfigAvrGet(AsyncWebServerRequest* request);
+    void handleApiConfigBackup(AsyncWebServerRequest* request);
+    void handleApiConfigRestore(AsyncWebServerRequest* request);
+    void handleApiConfigRestoreBody(AsyncWebServerRequest* request,
+                                     uint8_t* data, size_t len,
+                                     size_t index, size_t total);
     void handleNotFound(AsyncWebServerRequest* request);
 
     /**

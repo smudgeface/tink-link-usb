@@ -155,6 +155,7 @@
                 <a href="#debug">Debug</a>
                 <a href="#logs">Logs</a>
                 <a href="#ota">OTA</a>
+                <a href="#system">System</a>
                 <a href="#examples">Examples</a>
             </div>
 
@@ -666,6 +667,26 @@
   "message": "Update successful. Rebooting..."
 }</div>
                 </div>
+            </div>
+        </div>
+
+        <!-- System -->
+        <div class="card" id="system">
+            <h2>System</h2>
+
+            <div class="api-section">
+                <div class="api-header">
+                    <span class="method post">POST</span>
+                    <span class="api-path">/api/system/reboot</span>
+                    <button class="secondary try-btn" onclick="tryApi('POST', '/api/system/reboot')">Try</button>
+                    <p class="api-desc">Reboot the device. Returns a success response then restarts.</p>
+                </div>
+
+                <h4>Response</h4>
+                <div class="api-example">{
+  "status": "ok",
+  "message": "Rebooting..."
+}</div>
             </div>
         </div>
 

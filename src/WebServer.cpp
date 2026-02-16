@@ -125,6 +125,27 @@ void WebServer::setupRoutes() {
         }
     );
 
+    // Config backup endpoint - download all config files as JSON
+    _server->on("/api/config/backup", HTTP_GET,
+        [this](AsyncWebServerRequest* request) { handleApiConfigBackup(request); });
+
+    // Config restore endpoint - restore config files from JSON backup
+    _server->on("/api/config/restore", HTTP_POST,
+        [this](AsyncWebServerRequest* request) { handleApiConfigRestore(request); },
+        NULL,
+        [this](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+            handleApiConfigRestoreBody(request, data, len, index, total);
+        });
+
+    // System reboot endpoint
+    _server->on("/api/system/reboot", HTTP_POST,
+        [](AsyncWebServerRequest* request) {
+            LOG_INFO("WebServer: Reboot requested via API");
+            request->send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Rebooting...\"}");
+            delay(500);
+            ESP.restart();
+        });
+
     // Serve static files from LittleFS - must come AFTER API routes
     _server->serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 
@@ -769,6 +790,91 @@ void WebServer::handleApiConfigAvr(AsyncWebServerRequest* request) {
                  newConfig["input"].as<const char*>());
     } else {
         request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
+    }
+}
+
+void WebServer::handleApiConfigBackup(AsyncWebServerRequest* request) {
+    JsonDocument doc;
+
+    // Read config.json
+    File configFile = LittleFS.open("/config.json", "r");
+    if (configFile) {
+        JsonDocument configDoc;
+        if (!deserializeJson(configDoc, configFile)) {
+            doc["config"] = configDoc;
+        }
+        configFile.close();
+    }
+
+    // Read wifi.json
+    File wifiFile = LittleFS.open("/wifi.json", "r");
+    if (wifiFile) {
+        JsonDocument wifiDoc;
+        if (!deserializeJson(wifiDoc, wifiFile)) {
+            doc["wifi"] = wifiDoc;
+        }
+        wifiFile.close();
+    }
+
+    String response;
+    serializeJson(doc, response);
+    request->send(200, "application/json", response);
+    LOG_INFO("WebServer: Config backup created (%d bytes)", response.length());
+}
+
+void WebServer::handleApiConfigRestore(AsyncWebServerRequest* request) {
+    // Body is handled by handleApiConfigRestoreBody; this runs after body is complete
+    if (_restoreError.length() > 0) {
+        request->send(400, "application/json", "{\"error\":\"" + _restoreError + "\"}");
+        _restoreError = "";
+        return;
+    }
+    request->send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Config restored. Reboot to apply.\"}");
+}
+
+void WebServer::handleApiConfigRestoreBody(AsyncWebServerRequest* request,
+                                            uint8_t* data, size_t len,
+                                            size_t index, size_t total) {
+    // Accumulate body data
+    if (index == 0) {
+        _restoreBody = "";
+        _restoreError = "";
+    }
+    _restoreBody += String((char*)data, len);
+
+    // Process when complete
+    if (index + len >= total) {
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, _restoreBody);
+        _restoreBody = "";  // Free memory
+
+        if (error) {
+            _restoreError = "Invalid JSON: " + String(error.c_str());
+            LOG_ERROR("WebServer: Config restore failed: %s", _restoreError.c_str());
+            return;
+        }
+
+        // Write config.json
+        if (doc["config"].is<JsonObject>()) {
+            File file = LittleFS.open("/config.json", "w");
+            if (file) {
+                serializeJson(doc["config"], file);
+                file.close();
+                LOG_INFO("WebServer: Restored config.json");
+            }
+        }
+
+        // Write wifi.json
+        if (doc["wifi"].is<JsonObject>()) {
+            File file = LittleFS.open("/wifi.json", "w");
+            if (file) {
+                serializeJson(doc["wifi"], file);
+                file.close();
+                LOG_INFO("WebServer: Restored wifi.json");
+            }
+        }
+
+        LOG_INFO("WebServer: Config restore complete");
     }
 }
 

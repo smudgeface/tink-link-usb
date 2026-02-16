@@ -26,6 +26,37 @@ except ImportError:
     sys.exit(1)
 
 
+def backup_config(host: str) -> dict | None:
+    """Back up device config before filesystem flash."""
+    try:
+        resp = requests.get(f"http://{host}/api/config/backup", timeout=5)
+        if resp.status_code == 200:
+            backup = resp.json()
+            if backup.get("config") or backup.get("wifi"):
+                return backup
+    except Exception:
+        pass
+    return None
+
+
+def restore_config(host: str, backup: dict, retries: int = 5) -> bool:
+    """Restore device config after filesystem flash."""
+    import json
+    for attempt in range(retries):
+        try:
+            resp = requests.post(
+                f"http://{host}/api/config/restore",
+                json=backup,
+                timeout=10
+            )
+            if resp.status_code == 200:
+                return True
+        except Exception:
+            pass
+        time.sleep(3)
+    return False
+
+
 def upload_ota(host: str, filepath: str, mode: str, timeout: int = 120) -> bool:
     """
     Upload a binary file to the device via OTA.
@@ -75,6 +106,16 @@ def upload_ota(host: str, filepath: str, mode: str, timeout: int = 120) -> bool:
         print(f"       {e}")
         return False
 
+    # Back up config before filesystem flash
+    config_backup = None
+    if mode == 'fs':
+        print("Backing up device config...", end=" ", flush=True)
+        config_backup = backup_config(host)
+        if config_backup:
+            print(f"OK ({len(config_backup)} sections)")
+        else:
+            print("SKIP (no config found or backup not supported)")
+
     # Upload file
     print(f"Uploading {filename}...")
 
@@ -108,7 +149,24 @@ def upload_ota(host: str, filepath: str, mode: str, timeout: int = 120) -> bool:
                     pass
 
                 print("\nDevice is rebooting...")
-                print("Wait a few seconds, then reconnect.")
+
+                # Restore config after filesystem flash
+                if config_backup:
+                    print("Waiting for device to come back online...", flush=True)
+                    time.sleep(8)
+                    print("Restoring config...", end=" ", flush=True)
+                    if restore_config(host, config_backup):
+                        print("OK")
+                        print("Rebooting to apply restored config...")
+                        try:
+                            requests.post(f"http://{host}/api/system/reboot", timeout=5)
+                        except Exception:
+                            pass  # Connection drops on reboot
+                    else:
+                        print("FAILED")
+                        print("WARNING: Could not restore config. You may need to reconfigure manually.")
+                else:
+                    print("Wait a few seconds, then reconnect.")
                 return True
             else:
                 print(f"\nUpload failed! Status: {resp.status_code}")

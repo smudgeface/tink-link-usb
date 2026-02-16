@@ -154,6 +154,13 @@
             </div>
         </div>
 
+        <div class="card">
+            <h2>System</h2>
+            <div class="btn-row" style="gap: 8px;">
+                <button onclick="rebootDevice()" style="background: #dc3545;">Reboot Device</button>
+            </div>
+        </div>
+
         <footer class="footer">
             TinkLink-USB &middot; <a href="/api.html">API</a>
         </footer>
@@ -494,6 +501,21 @@
         function resetOtaUI() {
             document.getElementById('firmware-upload-btn').disabled = false;
             document.getElementById('fs-upload-btn').disabled = false;
+        }
+
+        function rebootDevice() {
+            if (!confirm('Reboot the device?')) return;
+            fetch('/api/system/reboot', { method: 'POST' })
+            .then(r => r.json())
+            .then(() => {
+                showMessage('Rebooting... Reconnecting in 5 seconds.', 'success');
+                setTimeout(() => window.location.reload(), 5000);
+            })
+            .catch(() => {
+                // Connection drops immediately on reboot — that's expected
+                showMessage('Rebooting... Reconnecting in 5 seconds.', 'success');
+                setTimeout(() => window.location.reload(), 5000);
+            });
         }
 
         // Initialize on page load
