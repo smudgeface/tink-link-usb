@@ -106,16 +106,15 @@ bool DenonAvr::startDiscovery() {
 
     _discoveredDevices.clear();
 
-    // Stop any existing socket to ensure clean binding to the STA interface
-    // This is especially important in AP_STA mode where the socket might be
-    // bound to the AP interface from a previous attempt
+    // Stop any existing socket from a previous discovery attempt
     _discoveryUdp.stop();
-    delay(10);  // Brief delay to ensure socket cleanup
 
-    // Note: In AP_STA mode, ESP32's WiFiUDP.beginMulticast() should automatically
-    // use the STA interface when WiFi.status() == WL_CONNECTED
-    if (!_discoveryUdp.beginMulticast(IPAddress(239, 255, 255, 250), 1900)) {
-        LOG_ERROR("DenonAvr: Failed to start UDP multicast (local IP: %s)", WiFi.localIP().toString().c_str());
+    // Use a regular UDP socket (not multicast) for SSDP M-SEARCH.
+    // M-SEARCH responses are sent as UNICAST back to the requester,
+    // so beginMulticast() won't receive them — it binds to the multicast
+    // group address and only sees multicast traffic.
+    if (!_discoveryUdp.begin(0)) {  // 0 = ephemeral port
+        LOG_ERROR("DenonAvr: Failed to start UDP socket for discovery");
         return false;
     }
 
