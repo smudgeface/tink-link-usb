@@ -1,6 +1,6 @@
 # TinkLink-USB
 
-> **Current Version**: 1.9.0
+> **Current Version**: 1.9.2
 
 An ESP32-based bridge between video switchers and the RetroTINK 4K.
 
@@ -35,6 +35,7 @@ The original [TinkLink](https://github.com/Patrick-Working/tink-link) project us
 - **System Console** - Web-based debug console with live log streaming and command sending to switcher, RetroTINK, or AVR
 - **OTA Updates** - Update firmware and filesystem over WiFi (no USB required)
 - **Centralized Logging** - Debug logs with timestamps accessible via web interface and `scripts/logs.py`
+- **WiFi Resilience** - Automatic retry with exponential backoff, AP fallback with periodic reconnection to saved network, and proper DHCP hostname registration
 - **mDNS Support** - Access via `http://tinklink.local`
 - **Persistent Configuration** - Settings stored in flash via LittleFS
 
@@ -489,6 +490,13 @@ tink-link-usb/
 ```
 
 ## Changelog
+
+### v1.9.2 — WiFi Resilience & DHCP Hostname
+
+- **AP mode reconnection** — When the device falls back to Access Point mode after losing WiFi, it now periodically attempts to reconnect to the saved network (every 30 seconds) using AP+STA mode. The AP remains accessible during reconnection attempts so the web UI is always reachable. On successful reconnection, the device transitions back to STA-only mode.
+- **DHCP hostname registration** — The device now properly registers its hostname (`tinklink`) with the router's DHCP server. Requires `WiFi.config()` before `WiFi.setHostname()` on ESP32 Arduino to ensure the hostname is included in DHCP requests. Hostname is re-set after every `WiFi.mode()` change to prevent the ESP32 from reverting to the default name.
+- **Disabled ESP32 auto-reconnect** — `WiFi.setAutoReconnect()` is now disabled. The ESP32's built-in auto-reconnect silently reconnects with the default hostname (`esp32s3-XXXX`), bypassing the application's hostname configuration. All reconnection is now handled by WifiManager's state machine, which properly configures the hostname before each connection attempt.
+- **Hostname in status API** — `GET /api/status` now includes `wifi.hostname` field showing the current DHCP hostname for diagnostics.
 
 ### v1.9.0 — Pluggable Switcher Architecture, ESP32-C3 Support & Power Management
 

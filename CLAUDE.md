@@ -6,7 +6,7 @@ This document provides guidelines and conventions for Claude (AI assistant) when
 
 TinkLink-USB is an ESP32-S3 USB bridge between video switchers and the RetroTINK 4K. It automatically triggers RetroTINK profile changes when video switcher inputs change.
 
-**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, and SSDP discovery all functional. Version 1.9.0.
+**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, and SSDP discovery all functional. Version 1.9.2.
 
 **Tech Stack:**
 - Platform: ESP32-S3 (Arduino framework, USB OTG mode)
@@ -333,6 +333,17 @@ These are acknowledged but not currently addressed:
 
 Don't proactively "fix" these unless user requests it.
 
+### WiFi Hostname (ESP32 Arduino Quirks)
+
+The DHCP hostname requires careful handling on ESP32 Arduino:
+- `WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE)` must be called
+  before `WiFi.setHostname()` — without it, the DHCP client ignores the hostname.
+- `WiFi.mode()` resets the hostname to the default (`esp32s3-XXXX`), so
+  `WiFi.config()` + `WiFi.setHostname()` must be called after every mode change.
+- `WiFi.setAutoReconnect(true)` causes the ESP32 WiFi stack to silently reconnect
+  with the default hostname, bypassing application code. Auto-reconnect is disabled;
+  all reconnection is handled by WifiManager's state machine.
+
 ### Safe Practices
 
 - Never commit credentials or secrets
@@ -406,4 +417,4 @@ tink-link-usb/
 
 ---
 
-**Last Updated**: 2026 (v1.9.0)
+**Last Updated**: 2026-02-15 (v1.9.2)
