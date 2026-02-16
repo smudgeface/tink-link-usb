@@ -17,6 +17,7 @@
  * Features:
  * - Automatic retry with exponential backoff on connection failure
  * - Automatic fallback to AP mode after max retries
+ * - Periodic reconnection attempts from AP mode to saved network
  * - Transient disconnect tolerance (3s debounce)
  * - mDNS advertisement for easy discovery
  * - Async network scanning
@@ -34,7 +35,7 @@ public:
     enum class Mode {
         STA,     ///< Station mode - connects to existing network
         AP,      ///< Access Point mode - creates hotspot
-        AP_STA   ///< Both modes simultaneously (not currently used)
+        AP_STA   ///< Both modes simultaneously (used during AP reconnection)
     };
 
     /** Connection state machine states */
@@ -179,10 +180,19 @@ private:
     unsigned long _lastRetryTime;
     unsigned long _lastDisconnectCheck;  // Track transient disconnects
 
+    // AP mode reconnection state
+    bool _apReconnecting;
+    unsigned long _lastApReconnectAttempt;
+    unsigned long _apReconnectStartTime;
+
     static const unsigned long CONNECT_TIMEOUT_MS = 15000;   // 15 seconds
     static const int MAX_RETRIES = 2;                        // 2 retries = 3 total attempts
     static const unsigned long BASE_RETRY_DELAY_MS = 5000;   // 5s, 10s delays
     static const unsigned long DISCONNECT_TOLERANCE_MS = 3000; // 3s tolerance for transient disconnects
+
+    // AP mode periodic reconnection to saved network
+    static const unsigned long AP_RECONNECT_INTERVAL_MS = 30000;  // 30s between attempts
+    static const unsigned long AP_RECONNECT_TIMEOUT_MS = 15000;   // 15s timeout per attempt
 
     APConfig _apConfig;
     StateChangeCallback _stateCallback;
@@ -191,6 +201,7 @@ private:
     void setupMDNS();
     void generateAPConfig();
     void handleRetryLogic();
+    void handleApReconnect();
     unsigned long getRetryDelay(int retryCount);
 };
 

@@ -10,6 +10,9 @@ WifiManager::WifiManager()
     , _retryDelayMs(0)
     , _lastRetryTime(0)
     , _lastDisconnectCheck(0)
+    , _apReconnecting(false)
+    , _lastApReconnectAttempt(0)
+    , _apReconnectStartTime(0)
     , _stateCallback(nullptr)
 {
     generateAPConfig();
@@ -21,7 +24,12 @@ bool WifiManager::begin(const String& hostname) {
 
     // Set WiFi mode to station initially
     WiFi.mode(WIFI_STA);
-    WiFi.setAutoReconnect(true);
+    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
+    WiFi.setHostname(_hostname.c_str());
+    // Disable ESP32 auto-reconnect — we handle all reconnection ourselves
+    // via handleRetryLogic() and handleApReconnect(). Auto-reconnect bypasses
+    // our code and reconnects with the default hostname (esp32s3-XXXX).
+    WiFi.setAutoReconnect(false);
 
     LOG_DEBUG("WifiManager: Initialized (hostname: %s)", _hostname.c_str());
     LOG_DEBUG("WifiManager: AP SSID will be '%s' if needed", _apConfig.ssid.c_str());
@@ -54,6 +62,10 @@ bool WifiManager::connect(const String& ssid, const String& password) {
 
     // Ensure we're in STA mode
     WiFi.mode(WIFI_STA);
+    // WiFi.config() must be called before setHostname() on ESP32 Arduino
+    // to ensure the DHCP client sends the hostname in its requests
+    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
+    WiFi.setHostname(_hostname.c_str());
     _mode = Mode::STA;
 
     WiFi.begin(ssid.c_str(), password.c_str());
@@ -117,8 +129,10 @@ void WifiManager::update() {
             break;
 
         case State::DISCONNECTED:
-            // Auto-reconnect is handled by WiFi library
+            // Idle state — entered after explicit disconnect() or stopAccessPoint().
+            // Connection only resumes via explicit connect() call.
             if (status == WL_CONNECTED) {
+                // Safety check: if WiFi connected unexpectedly, track it
                 setState(State::CONNECTED);
                 setupMDNS();
                 LOG_INFO("WifiManager: Reconnected - IP: %s",
@@ -142,7 +156,8 @@ void WifiManager::update() {
             break;
 
         case State::AP_ACTIVE:
-            // Nothing to do in AP mode, web interface handles everything
+            // Periodically attempt to reconnect to saved network
+            handleApReconnect();
             break;
     }
 }
@@ -266,9 +281,20 @@ bool WifiManager::startAccessPoint() {
     WiFi.disconnect(true);
     delay(100);
 
-    // Configure AP
-    WiFi.mode(WIFI_AP);
+    // Use AP+STA mode if we have saved credentials so we can periodically
+    // attempt to reconnect to the network while keeping the AP accessible
+    if (_ssid.length() > 0) {
+        WiFi.mode(WIFI_AP_STA);
+        LOG_DEBUG("WifiManager: AP+STA mode (will periodically retry '%s')", _ssid.c_str());
+    } else {
+        WiFi.mode(WIFI_AP);
+    }
     _mode = Mode::AP;
+
+    // Reset AP reconnection state
+    _apReconnecting = false;
+    _lastApReconnectAttempt = millis();  // Wait one full interval before first attempt
+    _apReconnectStartTime = 0;
 
     // Set static IP configuration
     if (!WiFi.softAPConfig(_apConfig.ip, _apConfig.gateway, _apConfig.subnet)) {
@@ -309,9 +335,13 @@ void WifiManager::stopAccessPoint() {
         LOG_INFO("WifiManager: Stopping Access Point...");
         WiFi.softAPdisconnect(true);
         WiFi.mode(WIFI_STA);
+        // Re-set hostname after mode change (WiFi.mode() resets it)
+        WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
+        WiFi.setHostname(_hostname.c_str());
         _mode = Mode::STA;
         _retryCount = 0;  // Reset retry counter for fresh STA connection
         _retryDelayMs = 0;
+        _apReconnecting = false;
         setState(State::DISCONNECTED);
     }
 }
@@ -319,6 +349,57 @@ void WifiManager::stopAccessPoint() {
 unsigned long WifiManager::getRetryDelay(int retryCount) {
     // Exponential backoff: 30s, 60s, 120s
     return BASE_RETRY_DELAY_MS * (1 << retryCount);
+}
+
+void WifiManager::handleApReconnect() {
+    // Only attempt reconnection if we have saved credentials
+    if (_ssid.length() == 0) return;
+
+    unsigned long now = millis();
+
+    if (_apReconnecting) {
+        wl_status_t status = WiFi.status();
+
+        if (status == WL_CONNECTED) {
+            // Successfully reconnected to the network
+            LOG_INFO("WifiManager: Reconnected to '%s' from AP mode - IP: %s",
+                     _ssid.c_str(), WiFi.localIP().toString().c_str());
+
+            // Transition from AP+STA to STA-only
+            WiFi.softAPdisconnect(true);
+            WiFi.mode(WIFI_STA);
+            // Re-set hostname after mode change (WiFi.mode() resets it)
+            WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
+            WiFi.setHostname(_hostname.c_str());
+            _mode = Mode::STA;
+            _apReconnecting = false;
+            _retryCount = 0;
+            _retryDelayMs = 0;
+            setState(State::CONNECTED);
+            setupMDNS();
+            return;
+        }
+
+        if (status == WL_CONNECT_FAILED ||
+            status == WL_NO_SSID_AVAIL ||
+            (now - _apReconnectStartTime >= AP_RECONNECT_TIMEOUT_MS)) {
+            // Attempt failed or timed out
+            LOG_DEBUG("WifiManager: AP reconnect attempt failed (status: %d)", status);
+            WiFi.disconnect(false);  // Stop STA attempt, keep AP running
+            _apReconnecting = false;
+            _lastApReconnectAttempt = now;
+        }
+    } else {
+        // Check if it's time for another attempt
+        if (now - _lastApReconnectAttempt >= AP_RECONNECT_INTERVAL_MS) {
+            LOG_INFO("WifiManager: Attempting to reconnect to '%s'...", _ssid.c_str());
+            WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
+            WiFi.setHostname(_hostname.c_str());
+            WiFi.begin(_ssid.c_str(), _password.c_str());
+            _apReconnecting = true;
+            _apReconnectStartTime = now;
+        }
+    }
 }
 
 void WifiManager::handleRetryLogic() {
