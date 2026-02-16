@@ -1,6 +1,6 @@
 # TinkLink-USB
 
-> **Current Version**: 1.9.2
+> **Current Version**: 1.9.3
 
 An ESP32-based bridge between video switchers and the RetroTINK 4K.
 
@@ -491,12 +491,13 @@ tink-link-usb/
 
 ## Changelog
 
-### v1.9.2 — WiFi Resilience & DHCP Hostname
+### v1.9.3 — WiFi Resilience & DHCP Hostname
 
 - **AP mode reconnection** — When the device falls back to Access Point mode after losing WiFi, it now periodically attempts to reconnect to the saved network (every 30 seconds) using AP+STA mode. The AP remains accessible during reconnection attempts so the web UI is always reachable. On successful reconnection, the device transitions back to STA-only mode.
 - **DHCP hostname registration** — The device now properly registers its hostname (`tinklink`) with the router's DHCP server. Requires `WiFi.config()` before `WiFi.setHostname()` on ESP32 Arduino to ensure the hostname is included in DHCP requests. Hostname is re-set after every `WiFi.mode()` change to prevent the ESP32 from reverting to the default name.
 - **Disabled ESP32 auto-reconnect** — `WiFi.setAutoReconnect()` is now disabled. The ESP32's built-in auto-reconnect silently reconnects with the default hostname (`esp32s3-XXXX`), bypassing the application's hostname configuration. All reconnection is now handled by WifiManager's state machine, which properly configures the hostname before each connection attempt.
-- **Hostname in status API** — `GET /api/status` now includes `wifi.hostname` field showing the current DHCP hostname for diagnostics.
+- **Correct AP_STA mode tracking** — `WifiManager::Mode` now correctly reflects `AP_STA` when the device is in dual AP+STA mode. `getMode()` and the `/api/status` `wifi.mode` field report `"ap_sta"` during AP reconnection attempts. All mode checks (`connect()`, `disconnect()`, `stopAccessPoint()`) handle both `AP` and `AP_STA`.
+- **Hostname in status API** — `GET /api/status` now includes `wifi.hostname` and correct `wifi.mode` fields for diagnostics.
 
 ### v1.9.0 — Pluggable Switcher Architecture, ESP32-C3 Support & Power Management
 

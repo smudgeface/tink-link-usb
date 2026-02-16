@@ -327,4 +327,4 @@ See `http://tinklink.local/api.html` for complete API documentation.
 
 ---
 
-**Last Updated:** 2026-02-08 (v1.9.1)
+**Last Updated:** 2026-02-15 (v1.9.3)

@@ -6,7 +6,7 @@ This document provides guidelines and conventions for Claude (AI assistant) when
 
 TinkLink-USB is an ESP32-S3 USB bridge between video switchers and the RetroTINK 4K. It automatically triggers RetroTINK profile changes when video switcher inputs change.
 
-**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, and SSDP discovery all functional. Version 1.9.2.
+**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, and SSDP discovery all functional. Version 1.9.3.
 
 **Tech Stack:**
 - Platform: ESP32-S3 (Arduino framework, USB OTG mode)
@@ -417,4 +417,4 @@ tink-link-usb/
 
 ---
 
-**Last Updated**: 2026-02-15 (v1.9.2)
+**Last Updated**: 2026-02-15 (v1.9.3)
