@@ -106,11 +106,16 @@ bool DenonAvr::startDiscovery() {
 
     _discoveredDevices.clear();
 
-    // In AP_STA mode, we need to explicitly bind to the STA interface for multicast
-    // The WiFi.localIP() ensures we're using the STA interface, not the AP
-    IPAddress localIP = WiFi.localIP();
-    if (!_discoveryUdp.beginMulticast(localIP, IPAddress(239, 255, 255, 250), 1900)) {
-        LOG_ERROR("DenonAvr: Failed to start UDP multicast (local IP: %s)", localIP.toString().c_str());
+    // Stop any existing socket to ensure clean binding to the STA interface
+    // This is especially important in AP_STA mode where the socket might be
+    // bound to the AP interface from a previous attempt
+    _discoveryUdp.stop();
+    delay(10);  // Brief delay to ensure socket cleanup
+
+    // Note: In AP_STA mode, ESP32's WiFiUDP.beginMulticast() should automatically
+    // use the STA interface when WiFi.status() == WL_CONNECTED
+    if (!_discoveryUdp.beginMulticast(IPAddress(239, 255, 255, 250), 1900)) {
+        LOG_ERROR("DenonAvr: Failed to start UDP multicast (local IP: %s)", WiFi.localIP().toString().c_str());
         return false;
     }
 

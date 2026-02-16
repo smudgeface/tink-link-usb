@@ -1,6 +1,6 @@
 # TinkLink-USB
 
-> **Current Version**: 1.9.3
+> **Current Version**: 1.9.4
 
 An ESP32-based bridge between video switchers and the RetroTINK 4K.
 
