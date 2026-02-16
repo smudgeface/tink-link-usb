@@ -47,8 +47,8 @@ bool WifiManager::connect(const String& ssid, const String& password) {
         return false;
     }
 
-    // If we're in AP mode, stop it and switch to STA
-    if (_mode == Mode::AP) {
+    // If we're in AP or AP+STA mode, stop it and switch to STA
+    if (_mode == Mode::AP || _mode == Mode::AP_STA) {
         stopAccessPoint();
     }
 
@@ -77,8 +77,8 @@ bool WifiManager::connect(const String& ssid, const String& password) {
 }
 
 void WifiManager::disconnect() {
-    // Don't allow disconnect in AP mode - doesn't make sense
-    if (_mode == Mode::AP) {
+    // Don't allow disconnect in AP or AP+STA mode - use connect() or stopAccessPoint() instead
+    if (_mode == Mode::AP || _mode == Mode::AP_STA) {
         LOG_WARN("WifiManager: Cannot disconnect in AP mode - use stopAccessPoint() instead");
         return;
     }
@@ -285,11 +285,12 @@ bool WifiManager::startAccessPoint() {
     // attempt to reconnect to the network while keeping the AP accessible
     if (_ssid.length() > 0) {
         WiFi.mode(WIFI_AP_STA);
+        _mode = Mode::AP_STA;
         LOG_DEBUG("WifiManager: AP+STA mode (will periodically retry '%s')", _ssid.c_str());
     } else {
         WiFi.mode(WIFI_AP);
+        _mode = Mode::AP;
     }
-    _mode = Mode::AP;
 
     // Reset AP reconnection state
     _apReconnecting = false;
@@ -331,7 +332,7 @@ bool WifiManager::startAccessPoint() {
 }
 
 void WifiManager::stopAccessPoint() {
-    if (_mode == Mode::AP) {
+    if (_mode == Mode::AP || _mode == Mode::AP_STA) {
         LOG_INFO("WifiManager: Stopping Access Point...");
         WiFi.softAPdisconnect(true);
         WiFi.mode(WIFI_STA);
