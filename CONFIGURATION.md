@@ -345,6 +345,16 @@ All user-facing settings apply immediately when changed via the web interface or
 
 Hardware-level settings (switcher type, serial mode, pins) only apply at boot since they represent physical hardware that doesn't change at runtime. These are typically set once during initial setup.
 
+## Config Backup Format Versioning
+
+Configuration backups created via `/api/config/backup` now include a `"version"` field (e.g., `"1.0"`) which tracks the format of the backup JSON.
+
+- **Major Version:** Indicates potentially breaking changes in the config structure (e.g., fields renamed, removed, or type changed). Backups with a higher major version than the device's firmware supports will be rejected by the `/api/config/restore` endpoint to prevent data corruption.
+- **Minor Version:** Indicates non-breaking changes, such as the addition of new fields. Minor version differences are generally compatible.
+- **Legacy Backups:** Backups created by older firmware versions (without a `"version"` field) are still supported and can be restored.
+
+This versioning ensures that restoring old or incompatible configuration files doesn't lead to unexpected behavior.
+
 ---
 
-**Last Updated:** 2026-02-16 (v1.9.5)
+**Last Updated:** 2026-02-16 (v1.10.0)

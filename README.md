@@ -1,6 +1,6 @@
 # TinkLink-USB
 
-> **Current Version**: 1.9.5
+> **Current Version**: 1.10.0
 
 An ESP32-based bridge between video switchers and the RetroTINK 4K.
 
@@ -492,6 +492,14 @@ tink-link-usb/
 ```
 
 ## Changelog
+
+### v1.10.0 — UI Improvements, Config Versioning & Robustness
+
+- **Responsive UI for System Page** — All buttons (OTA upload, config backup/restore, LED controls, reboot) on the `/system.html` page now use a responsive flex layout (`.btn-row` class). They appear side-by-side in landscape view and stack vertically with full width in portrait view for better mobile usability.
+- **Config Backup Versioning** — Configuration backups (`/api/config/backup`) now include a `"version": "1.0"` field. The restore function (`/api/config/restore`) validates this version: it accepts legacy backups (no version field) and compatible major versions (e.g., any 1.x version), but rejects incompatible major versions (e.g., 2.x+) to prevent restoring corrupted settings.
+- **Robust WiFi Scan/AVR Discovery** — Fixed an issue where initial WiFi scans and AVR discoveries on `/config.html` and the UI required two clicks to show results. The first click now correctly initiates the scan/discovery and reports a "scanning"/"discovering" status, allowing the UI to poll for results.
+- **Default AVR Input** — Changed the default AVR input to `"DVD"` from `"GAME"`.
+- **Improved UI for OTA Uploads** — Shortened "Upload Firmware" and "Upload Filesystem" button text to simply "Upload" on the `/system.html` page to prevent overflow with the file input field, particularly on smaller screens.
 
 ### v1.9.5 — Live Config, Reboot API & Config Backup
 

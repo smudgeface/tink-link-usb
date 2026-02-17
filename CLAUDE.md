@@ -6,7 +6,7 @@ This document provides guidelines and conventions for Claude (AI assistant) when
 
 TinkLink-USB is an ESP32-S3 USB bridge between video switchers and the RetroTINK 4K. It automatically triggers RetroTINK profile changes when video switcher inputs change.
 
-**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, SSDP discovery, config backup/restore, and reboot API all functional. Version 1.9.5.
+**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, SSDP discovery, config backup/restore, and reboot API all functional. Version 1.10.0.
 
 **Tech Stack:**
 - Platform: ESP32-S3 (Arduino framework, USB OTG mode)
@@ -61,6 +61,26 @@ Version is stored in `src/version.h`:
 #define TINKLINK_VERSION_PATCH 0
 #define TINKLINK_VERSION_STRING "1.3.0"
 ```
+
+### Config Backup Format Versioning
+
+The config backup JSON includes a `"version"` field using **MAJOR.MINOR** format (currently `"1.0"`). This is **separate from firmware versioning** — it tracks the backup file format, not the firmware release.
+
+**Version rules:**
+- **Major bump** = breaking change (removed/renamed properties, type changes). Restore will **reject** backups with a higher major version.
+- **Minor bump** = non-breaking change (new properties added). Restore will **accept** any minor version within the same major.
+
+**Compatibility policy:**
+- Aim to **never make breaking changes**. Add new fields, don't remove or rename existing ones.
+- If a breaking change is unavoidable, bump the major version and add migration logic to the restore handler (or fail gracefully with a clear error).
+- Legacy backups without a `"version"` field are always accepted (treated as pre-1.0).
+
+**When to bump:**
+- Adding a new config section or property → bump minor (e.g., `1.0` → `1.1`)
+- Removing, renaming, or changing the type of a property → bump major (e.g., `1.0` → `2.0`)
+- Bug fixes to backup/restore logic → no version bump needed
+
+The version constant is in the `handleApiConfigBackup()` method in `WebServer.cpp`.
 
 ### Git Tags
 
@@ -430,6 +450,26 @@ All user-facing configuration changes must apply immediately without requiring a
 
 Hardware-level settings (switcher type, RetroTink serial mode, pin assignments) are boot-only since they represent physical hardware that doesn't change at runtime.
 
+### Config Backup Format Versioning
+
+The config backup JSON includes a `"version"` field using **MAJOR.MINOR** format (currently `"1.0"`). This is **separate from firmware versioning** — it tracks the backup file format, not the firmware release.
+
+**Version rules:**
+- **Major bump** = breaking change (removed/renamed properties, type changes). Restore will **reject** backups with a higher major version.
+- **Minor bump** = non-breaking change (new properties added). Restore will **accept** any minor version within the same major.
+
+**Compatibility policy:**
+- Aim to **never make breaking changes**. Add new fields, don't remove or rename existing ones.
+- If a breaking change is unavoidable, bump the major version and add migration logic to the restore handler (or fail gracefully with a clear error).
+- Legacy backups without a `"version"` field are always accepted (treated as pre-1.0).
+
+**When to bump:**
+- Adding a new config section or property → bump minor (e.g., `1.0` → `1.1`)
+- Removing, renaming, or changing the type of a property → bump major (e.g., `1.0` → `2.0`)
+- Bug fixes to backup/restore logic → no version bump needed
+
+The version constant is in the `handleApiConfigBackup()` method in `WebServer.cpp`.
+
 ---
 
-**Last Updated**: 2026-02-16 (v1.9.5)
+**Last Updated**: 2026-02-16 (v1.10.0)

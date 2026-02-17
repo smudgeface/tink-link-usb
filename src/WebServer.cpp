@@ -806,6 +806,11 @@ void WebServer::handleApiConfigAvr(AsyncWebServerRequest* request) {
 void WebServer::handleApiConfigBackup(AsyncWebServerRequest* request) {
     JsonDocument doc;
 
+    // Backup format version (MAJOR.MINOR)
+    // Major bump = breaking change (removed/renamed fields, type changes)
+    // Minor bump = non-breaking change (new fields added)
+    doc["version"] = "1.0";
+
     // Read config.json
     File configFile = LittleFS.open("/config.json", "r");
     if (configFile) {
@@ -862,6 +867,23 @@ void WebServer::handleApiConfigRestoreBody(AsyncWebServerRequest* request,
             _restoreError = "Invalid JSON: " + String(error.c_str());
             LOG_ERROR("WebServer: Config restore failed: %s", _restoreError.c_str());
             return;
+        }
+
+        // Validate backup version
+        // Accept: missing version (legacy), same major version (any minor)
+        // Reject: unknown major version
+        if (doc["version"].is<const char*>()) {
+            String version = doc["version"].as<String>();
+            int dotIdx = version.indexOf('.');
+            int major = (dotIdx > 0) ? version.substring(0, dotIdx).toInt() : version.toInt();
+            if (major > 1) {
+                _restoreError = "Incompatible backup version " + version + " (expected 1.x)";
+                LOG_ERROR("WebServer: %s", _restoreError.c_str());
+                return;
+            }
+            LOG_INFO("WebServer: Restoring backup version %s", version.c_str());
+        } else {
+            LOG_INFO("WebServer: Restoring legacy backup (no version)");
         }
 
         // Write config.json
