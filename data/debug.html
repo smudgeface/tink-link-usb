@@ -78,7 +78,9 @@
                 <h3 style="font-size: 1em; margin-bottom: 10px;">Firmware (.bin)</h3>
                 <form id="ota-firmware-form" onsubmit="return uploadOTA(event, 'firmware')">
                     <input type="file" id="firmware-file" accept=".bin" style="width: 100%; margin-bottom: 8px;">
-                    <button type="submit" id="firmware-upload-btn" style="width: 100%;">Upload Firmware</button>
+                    <div class="btn-row" style="margin-top: 0;">
+                        <button type="submit" id="firmware-upload-btn">Upload Firmware</button>
+                    </div>
                 </form>
             </div>
 
@@ -86,7 +88,9 @@
                 <h3 style="font-size: 1em; margin-bottom: 10px;">Filesystem (.bin)</h3>
                 <form id="ota-fs-form" onsubmit="return uploadOTA(event, 'fs')">
                     <input type="file" id="fs-file" accept=".bin" style="width: 100%; margin-bottom: 8px;">
-                    <button type="submit" id="fs-upload-btn" style="width: 100%;">Upload Filesystem</button>
+                    <div class="btn-row" style="margin-top: 0;">
+                        <button type="submit" id="fs-upload-btn">Upload Filesystem</button>
+                    </div>
                 </form>
             </div>
 
@@ -104,8 +108,10 @@
             <p style="font-size: 0.9em; color: #888; margin-bottom: 15px;">
                 Backup or restore all device settings (WiFi, triggers, AVR) as a JSON file.
             </p>
-            <button onclick="downloadBackup()" style="width: 100%; margin-bottom: 8px;">Download Backup</button>
-            <button onclick="document.getElementById('restore-file').click()" class="secondary" style="width: 100%;">Restore from File</button>
+            <div class="btn-row">
+                <button onclick="downloadBackup()">Download Backup</button>
+                <button onclick="document.getElementById('restore-file').click()" class="secondary">Restore from File</button>
+            </div>
             <input type="file" id="restore-file" accept=".json" style="display: none;" onchange="restoreBackup(this)">
         </div>
 
