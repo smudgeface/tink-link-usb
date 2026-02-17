@@ -19,7 +19,7 @@ DenonAvr::~DenonAvr() {
 }
 
 void DenonAvr::configure(const JsonObject& config) {
-    _input = config["input"] | "GAME";
+    _input = config["input"] | "DVD";
     String ip = config["ip"] | "";
 
     LOG_DEBUG("DenonAvr: Configuring (ip=%s, input=%s)", ip.c_str(), _input.c_str());

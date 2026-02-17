@@ -233,31 +233,30 @@ void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
 void WebServer::handleApiScan(AsyncWebServerRequest* request) {
     JsonDocument doc;
 
-    // Check if scan is complete
     if (_wifi->isScanComplete()) {
-        // Get results
         auto networks = _wifi->getScanResults();
 
-        doc["status"] = "complete";
-        JsonArray networksArray = doc["networks"].to<JsonArray>();
-
-        for (const auto& net : networks) {
-            JsonObject netObj = networksArray.add<JsonObject>();
-            netObj["ssid"] = net.ssid;
-            netObj["rssi"] = net.rssi;
-            netObj["secure"] = net.encryptionType != WIFI_AUTH_OPEN;
-        }
-
-        // Start a new scan for next time
-        _wifi->startScan();
-    } else {
-        // Try to start a new scan
-        if (_wifi->startScan()) {
-            doc["status"] = "scanning";
+        if (networks.size() > 0) {
+            // Have results — return them and start next scan
+            doc["status"] = "complete";
+            JsonArray networksArray = doc["networks"].to<JsonArray>();
+            for (const auto& net : networks) {
+                JsonObject netObj = networksArray.add<JsonObject>();
+                netObj["ssid"] = net.ssid;
+                netObj["rssi"] = net.rssi;
+                netObj["secure"] = net.encryptionType != WIFI_AUTH_OPEN;
+            }
+            _wifi->startScan();
         } else {
-            doc["status"] = "scanning";  // Already in progress
+            // Complete but no results (first call or empty) — start a scan
+            _wifi->startScan();
+            doc["status"] = "scanning";
+            doc["networks"].to<JsonArray>();
         }
-        doc["networks"] = JsonArray();
+    } else {
+        // Scan in progress
+        doc["status"] = "scanning";
+        doc["networks"].to<JsonArray>();
     }
 
     String response;
@@ -709,21 +708,26 @@ void WebServer::handleApiAvrDiscover(AsyncWebServerRequest* request) {
     if (avr()->isDiscoveryComplete()) {
         auto devices = avr()->getDiscoveryResults();
 
-        doc["status"] = "complete";
-        JsonArray devicesArray = doc["devices"].to<JsonArray>();
-
-        for (const auto& dev : devices) {
-            JsonObject devObj = devicesArray.add<JsonObject>();
-            devObj["ip"] = dev.ip;
-            devObj["name"] = dev.friendlyName;
+        if (devices.size() > 0) {
+            // Have results — return them and start next discovery
+            doc["status"] = "complete";
+            JsonArray devicesArray = doc["devices"].to<JsonArray>();
+            for (const auto& dev : devices) {
+                JsonObject devObj = devicesArray.add<JsonObject>();
+                devObj["ip"] = dev.ip;
+                devObj["name"] = dev.friendlyName;
+            }
+            avr()->startDiscovery();
+        } else {
+            // Complete but no results (first call or nothing found) — start discovery
+            avr()->startDiscovery();
+            doc["status"] = "discovering";
+            doc["devices"].to<JsonArray>();
         }
-
-        // Start a new scan for the next poll
-        avr()->startDiscovery();
     } else {
-        avr()->startDiscovery(); // Start if not already running
+        // Discovery in progress
         doc["status"] = "discovering";
-        doc["devices"] = JsonArray();
+        doc["devices"].to<JsonArray>();
     }
 
     String response;
@@ -738,7 +742,7 @@ void WebServer::handleApiConfigAvrGet(AsyncWebServerRequest* request) {
     doc["type"] = avrConfig["type"] | "Denon X4300H";
     doc["enabled"] = avrConfig["enabled"] | false;
     doc["ip"] = avrConfig["ip"] | "";
-    doc["input"] = avrConfig["input"] | "GAME";
+    doc["input"] = avrConfig["input"] | "DVD";
 
     String response;
     serializeJson(doc, response);
@@ -754,7 +758,7 @@ void WebServer::handleApiConfigAvr(AsyncWebServerRequest* request) {
     newConfigDoc["type"] = avrConfig["type"] | "Denon X4300H";
     newConfigDoc["enabled"] = avrConfig["enabled"] | false;
     newConfigDoc["ip"] = avrConfig["ip"] | "";
-    newConfigDoc["input"] = avrConfig["input"] | "GAME";
+    newConfigDoc["input"] = avrConfig["input"] | "DVD";
 
     // Update with request params
     if (request->hasParam("enabled", true)) {

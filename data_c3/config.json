@@ -21,7 +21,7 @@
         "type": "Denon X4300H",
         "enabled": false,
         "ip": "",
-        "input": "GAME"
+        "input": "DVD"
     },
     "hostname": "tinklink-c3",
     "triggers": [
