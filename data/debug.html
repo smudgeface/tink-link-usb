@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Debug - TinkLink-USB</title>
+    <title>System - TinkLink-USB</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,19 +13,19 @@
         <nav>
             <a href="/">Status</a>
             <a href="/config.html">Config</a>
-            <a href="/debug.html" class="active">Debug</a>
+            <a href="/debug.html" class="active">System</a>
             <a href="/api.html">API</a>
         </nav>
 
         <div id="message"></div>
 
+        <!-- Console -->
         <div class="card">
-            <h2>System Console</h2>
+            <h2>Console</h2>
             <p style="margin-bottom: 10px; font-size: 0.9em; color: #888;">
-                Shows system logs and UART messages.
+                System logs and device commands.
             </p>
 
-            <!-- Console Output -->
             <div class="console-wrap">
                 <div id="console-output" class="console-output"><span style="color: #569cd6;">TinkLink-USB Serial Console</span>
 <span style="color: #6a9955;">Ready. Type below and press Enter to send.</span>
@@ -33,7 +33,6 @@
 </div>
             </div>
 
-            <!-- Console Input -->
             <form id="console-form" onsubmit="return sendConsoleCommand(event)" style="margin: 0;">
                 <div class="console-input-bar">
                     <select id="console-target">
@@ -48,7 +47,6 @@
                 </div>
             </form>
 
-            <!-- Quick Commands -->
             <div class="quick-commands">
                 <div class="quick-cmd-group">
                     <span class="quick-cmd-label">Switcher:</span>
@@ -72,77 +70,23 @@
             </div>
         </div>
 
+        <!-- Firmware Update -->
         <div class="card">
-            <h2>LED Color Tester</h2>
-            <p><strong>Note:</strong> LED will return to WiFi state indication mode after 10 seconds</p>
-
-            <div style="margin-top: 20px;">
-                <h3>Color Test Buttons</h3>
-                <div class="btn-row" style="flex-wrap: wrap; gap: 8px;">
-                    <button onclick="setLEDColor('red')" style="background: #dc3545;">Red</button>
-                    <button onclick="setLEDColor('green')" style="background: #28a745;">Green</button>
-                    <button onclick="setLEDColor('blue')" style="background: #007bff;">Blue</button>
-                    <button onclick="setLEDColor('yellow')" style="background: #ffc107; color: #000;">Yellow</button>
-                    <button onclick="setLEDColor('cyan')" style="background: #17a2b8;">Cyan</button>
-                    <button onclick="setLEDColor('magenta')" style="background: #e83e8c;">Magenta</button>
-                    <button onclick="setLEDColor('white')" style="background: #f8f9fa; color: #000;">White</button>
-                    <button onclick="setLEDColor('off')" style="background: #343a40;">Off</button>
-                </div>
-
-                <div style="margin-top: 20px;">
-                    <h3>Custom RGB Values</h3>
-                    <form id="led-form" onsubmit="return setCustomLED(event)">
-                        <div style="display: flex; gap: 10px; align-items: flex-end;">
-                            <div class="input-group" style="flex: 1;">
-                                <label for="led-r">Red</label>
-                                <input type="number" id="led-r" min="0" max="255" value="255">
-                            </div>
-                            <div class="input-group" style="flex: 1;">
-                                <label for="led-g">Green</label>
-                                <input type="number" id="led-g" min="0" max="255" value="0">
-                            </div>
-                            <div class="input-group" style="flex: 1;">
-                                <label for="led-b">Blue</label>
-                                <input type="number" id="led-b" min="0" max="255" value="0">
-                            </div>
-                            <div class="input-group" style="flex: 1; margin-bottom: 18px;">
-                                <label for="led-b"></label>
-                                <button type="submit">Set Color</button>
-                            </div>
-                            
-                        </div>
-                    </form>
-                </div>
-
-                <div style="margin-top: 15px;">
-                    <button onclick="resetLED()" class="secondary">Return to WiFi Mode</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <h2>Firmware Update (OTA)</h2>
-            <p style="font-size: 0.9em; color: #888; margin-bottom: 15px;">
-                Update firmware or filesystem over WiFi. Device will reboot after successful update.
-            </p>
+            <h2>Firmware Update</h2>
 
             <div style="margin-bottom: 20px;">
                 <h3 style="font-size: 1em; margin-bottom: 10px;">Firmware (.bin)</h3>
                 <form id="ota-firmware-form" onsubmit="return uploadOTA(event, 'firmware')">
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <input type="file" id="firmware-file" accept=".bin" style="flex: 1;">
-                        <button type="submit" id="firmware-upload-btn">Upload File</button>
-                    </div>
+                    <input type="file" id="firmware-file" accept=".bin" style="width: 100%; margin-bottom: 8px;">
+                    <button type="submit" id="firmware-upload-btn" style="width: 100%;">Upload Firmware</button>
                 </form>
             </div>
 
             <div style="margin-bottom: 20px;">
                 <h3 style="font-size: 1em; margin-bottom: 10px;">Filesystem (.bin)</h3>
                 <form id="ota-fs-form" onsubmit="return uploadOTA(event, 'fs')">
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <input type="file" id="fs-file" accept=".bin" style="flex: 1;">
-                        <button type="submit" id="fs-upload-btn">Upload File</button>
-                    </div>
+                    <input type="file" id="fs-file" accept=".bin" style="width: 100%; margin-bottom: 8px;">
+                    <button type="submit" id="fs-upload-btn" style="width: 100%;">Upload Filesystem</button>
                 </form>
             </div>
 
@@ -154,11 +98,63 @@
             </div>
         </div>
 
+        <!-- Config Backup -->
         <div class="card">
-            <h2>System</h2>
-            <div class="btn-row" style="gap: 8px;">
-                <button onclick="rebootDevice()" style="background: #dc3545;">Reboot Device</button>
+            <h2>Config Backup</h2>
+            <p style="font-size: 0.9em; color: #888; margin-bottom: 15px;">
+                Download all device settings (WiFi, triggers, AVR) as a JSON file.
+            </p>
+            <button onclick="downloadBackup()" style="width: 100%;">Download Backup</button>
+        </div>
+
+        <!-- LED Tester -->
+        <div class="card">
+            <h2>LED Tester</h2>
+            <p style="font-size: 0.9em; color: #888; margin-bottom: 10px;">Returns to WiFi status mode after 10 seconds.</p>
+
+            <div class="btn-row" style="flex-wrap: wrap; gap: 8px;">
+                <button onclick="setLEDColor('red')" style="background: #dc3545;">Red</button>
+                <button onclick="setLEDColor('green')" style="background: #28a745;">Green</button>
+                <button onclick="setLEDColor('blue')" style="background: #007bff;">Blue</button>
+                <button onclick="setLEDColor('yellow')" style="background: #ffc107; color: #000;">Yellow</button>
+                <button onclick="setLEDColor('cyan')" style="background: #17a2b8;">Cyan</button>
+                <button onclick="setLEDColor('magenta')" style="background: #e83e8c;">Magenta</button>
+                <button onclick="setLEDColor('white')" style="background: #f8f9fa; color: #000;">White</button>
+                <button onclick="setLEDColor('off')" style="background: #343a40;">Off</button>
             </div>
+
+            <div style="margin-top: 15px;">
+                <h3 style="font-size: 1em; margin-bottom: 10px;">Custom RGB</h3>
+                <form id="led-form" onsubmit="return setCustomLED(event)">
+                    <div style="display: flex; gap: 10px; align-items: flex-end;">
+                        <div class="input-group" style="flex: 1;">
+                            <label for="led-r">R</label>
+                            <input type="number" id="led-r" min="0" max="255" value="255">
+                        </div>
+                        <div class="input-group" style="flex: 1;">
+                            <label for="led-g">G</label>
+                            <input type="number" id="led-g" min="0" max="255" value="0">
+                        </div>
+                        <div class="input-group" style="flex: 1;">
+                            <label for="led-b">B</label>
+                            <input type="number" id="led-b" min="0" max="255" value="0">
+                        </div>
+                        <div style="flex: 1; margin-bottom: 18px;">
+                            <button type="submit" style="width: 100%;">Set</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div style="margin-top: 10px;">
+                <button onclick="resetLED()" class="secondary" style="width: 100%;">Return to WiFi Mode</button>
+            </div>
+        </div>
+
+        <!-- Reboot -->
+        <div class="card">
+            <h2>Reboot</h2>
+            <button onclick="rebootDevice()" style="background: #dc3545; width: 100%;">Reboot Device</button>
         </div>
 
         <footer class="footer">
@@ -176,51 +172,37 @@
             messageTimeout = setTimeout(() => msg.innerHTML = '', 5000);
         }
 
+        // LED functions
         function setLEDColor(color) {
             fetch('/api/debug/led', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'color=' + color
             })
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
-                if (data.error) {
-                    showMessage('Error: ' + data.error, 'error');
-                } else {
-                    showMessage('LED set to ' + color.toUpperCase() + ' (R:' + data.r + ' G:' + data.g + ' B:' + data.b + ')', 'success');
-                }
+                if (data.error) showMessage('Error: ' + data.error, 'error');
+                else showMessage('LED: ' + color.toUpperCase() + ' (R:' + data.r + ' G:' + data.g + ' B:' + data.b + ')', 'success');
             })
-            .catch(err => {
-                showMessage('Failed to set LED color', 'error');
-                console.error('LED set failed:', err);
-            });
+            .catch(() => showMessage('Failed to set LED color', 'error'));
         }
 
         function setCustomLED(event) {
             event.preventDefault();
-
             const r = document.getElementById('led-r').value;
             const g = document.getElementById('led-g').value;
             const b = document.getElementById('led-b').value;
-
             fetch('/api/debug/led', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'r=' + r + '&g=' + g + '&b=' + b
             })
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
-                if (data.error) {
-                    showMessage('Error: ' + data.error, 'error');
-                } else {
-                    showMessage('LED set to RGB(' + data.r + ',' + data.g + ',' + data.b + ')', 'success');
-                }
+                if (data.error) showMessage('Error: ' + data.error, 'error');
+                else showMessage('LED: RGB(' + data.r + ',' + data.g + ',' + data.b + ')', 'success');
             })
-            .catch(err => {
-                showMessage('Failed to set LED color', 'error');
-                console.error('LED set failed:', err);
-            });
-
+            .catch(() => showMessage('Failed to set LED color', 'error'));
             return false;
         }
 
@@ -230,33 +212,56 @@
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'reset=1'
             })
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
-                if (data.error) {
-                    showMessage('Error: ' + data.error, 'error');
-                } else {
-                    showMessage('LED returned to WiFi mode', 'success');
-                }
+                if (data.error) showMessage('Error: ' + data.error, 'error');
+                else showMessage('LED returned to WiFi mode', 'success');
             })
-            .catch(err => {
-                showMessage('Failed to reset LED', 'error');
-                console.error('LED reset failed:', err);
+            .catch(() => showMessage('Failed to reset LED', 'error'));
+        }
+
+        // Config backup
+        function downloadBackup() {
+            fetch('/api/config/backup')
+            .then(r => r.json())
+            .then(data => {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'tinklink-backup.json';
+                a.click();
+                URL.revokeObjectURL(url);
+                showMessage('Backup downloaded', 'success');
+            })
+            .catch(() => showMessage('Failed to download backup', 'error'));
+        }
+
+        // Reboot
+        function rebootDevice() {
+            if (!confirm('Reboot the device?')) return;
+            fetch('/api/system/reboot', { method: 'POST' })
+            .then(() => {
+                showMessage('Rebooting... Reconnecting in 5 seconds.', 'success');
+                setTimeout(() => window.location.reload(), 5000);
+            })
+            .catch(() => {
+                showMessage('Rebooting... Reconnecting in 5 seconds.', 'success');
+                setTimeout(() => window.location.reload(), 5000);
             });
         }
 
-        // Serial Console functions
+        // Console functions
         let consoleAutoRefreshInterval = null;
         let consoleAutoScroll = true;
         let lastLogCount = 0;
 
         function formatTimestamp(ms) {
-            // Format milliseconds since boot as [HH:MM:SS.mmm]
             const totalSeconds = Math.floor(ms / 1000);
             const hours = Math.floor(totalSeconds / 3600);
             const minutes = Math.floor((totalSeconds % 3600) / 60);
             const seconds = totalSeconds % 60;
             const milliseconds = ms % 1000;
-
             return `[${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}]`;
         }
 
@@ -264,109 +269,65 @@
             const consoleOutput = document.getElementById('console-output');
             const line = document.createElement('span');
             line.style.display = 'block';
-
-            // Add timestamp prefix for backend messages (if provided)
             const tsPrefix = timestamp !== undefined ?
                 '<span style="color: #b6b6b6;">' + formatTimestamp(timestamp) + '</span> ' : '';
 
-            if (type === 'tx-switcher') {
-                line.innerHTML = '<span style="color: #569cd6;">[switcher] &gt; ' + escapeHtml(text) + '</span>';
-            } else if (type === 'tx-tink') {
-                line.innerHTML = '<span style="color: #c586c0;">[tink] &gt; ' + escapeHtml(text) + '</span>';
-            } else if (type === 'tx') {
-                line.innerHTML = '<span style="color: #569cd6;">&gt; ' + escapeHtml(text) + '</span>';
-            } else if (type === 'rx-switcher') {
-                line.innerHTML = tsPrefix + '<span style="color: #4ec9b0;">[switcher] &lt; ' + escapeHtml(text) + '</span>';
-            } else if (type === 'rx-tink') {
-                line.innerHTML = tsPrefix + '<span style="color: #ce9178;">[tink] &lt; ' + escapeHtml(text) + '</span>';
-            } else if (type === 'tx-avr') {
-                line.innerHTML = '<span style="color: #dcdcaa;">[avr] &gt; ' + escapeHtml(text) + '</span>';
-            } else if (type === 'rx-avr') {
-                line.innerHTML = tsPrefix + '<span style="color: #b5cea8;">[avr] &lt; ' + escapeHtml(text) + '</span>';
-            } else if (type === 'rx') {
-                line.innerHTML = tsPrefix + '<span style="color: #4ec9b0;">&lt; ' + escapeHtml(text) + '</span>';
-            } else if (type === 'log-debug') {
-                line.innerHTML = tsPrefix + '<span style="color: #b6b6b6;">[D] ' + escapeHtml(text) + '</span>';
-            } else if (type === 'log-info') {
-                line.innerHTML = tsPrefix + '<span style="color: #9cdcfe;">[I] ' + escapeHtml(text) + '</span>';
-            } else if (type === 'log-warn') {
-                line.innerHTML = tsPrefix + '<span style="color: #dcdcaa;">[W] ' + escapeHtml(text) + '</span>';
-            } else if (type === 'log-error') {
-                line.innerHTML = tsPrefix + '<span style="color: #f14c4c;">[E] ' + escapeHtml(text) + '</span>';
-            } else if (type === 'system') {
-                line.innerHTML = '<span style="color: #6a9955;">' + escapeHtml(text) + '</span>';
-            } else {
-                line.textContent = text;
-            }
+            const colors = {
+                'tx-switcher': '#569cd6', 'tx-tink': '#c586c0', 'tx': '#569cd6',
+                'rx-switcher': '#4ec9b0', 'rx-tink': '#ce9178',
+                'tx-avr': '#dcdcaa', 'rx-avr': '#b5cea8', 'rx': '#4ec9b0',
+                'log-debug': '#b6b6b6', 'log-info': '#9cdcfe',
+                'log-warn': '#dcdcaa', 'log-error': '#f14c4c', 'system': '#6a9955'
+            };
+
+            const prefixes = {
+                'tx-switcher': '[switcher] &gt; ', 'tx-tink': '[tink] &gt; ', 'tx': '&gt; ',
+                'rx-switcher': '[switcher] &lt; ', 'rx-tink': '[tink] &lt; ',
+                'tx-avr': '[avr] &gt; ', 'rx-avr': '[avr] &lt; ', 'rx': '&lt; ',
+                'log-debug': '[D] ', 'log-info': '[I] ', 'log-warn': '[W] ', 'log-error': '[E] ',
+                'system': ''
+            };
+
+            const color = colors[type] || '#eee';
+            const prefix = prefixes[type] || '';
+            const useTs = type && type.startsWith('rx') || type && type.startsWith('log');
+            line.innerHTML = (useTs ? tsPrefix : '') + '<span style="color: ' + color + ';">' + prefix + escapeHtml(text) + '</span>';
 
             consoleOutput.appendChild(line);
-
-            // Auto-scroll if enabled
-            if (consoleAutoScroll) {
-                consoleOutput.scrollTop = consoleOutput.scrollHeight;
-            }
+            if (consoleAutoScroll) consoleOutput.scrollTop = consoleOutput.scrollHeight;
         }
 
         function getLogType(level) {
-            switch (level) {
-                case 0: return 'log-debug';
-                case 1: return 'log-info';
-                case 2: return 'log-warn';
-                case 3: return 'log-error';
-                default: return 'log-info';
-            }
+            return ['log-debug', 'log-info', 'log-warn', 'log-error'][level] || 'log-info';
         }
 
         function sendConsoleCommand(event, targetOverride) {
             event.preventDefault();
-
             const input = document.getElementById('console-input');
             const command = input.value.trim();
             const target = targetOverride || document.getElementById('console-target').value;
+            if (!command) return false;
 
-            if (!command) {
-                return false;
-            }
-
-            // Route to appropriate API
-            let apiUrl = '/api/switcher/send';
-            let bodyParam = 'message';
-
-            if (target === 'tink') {
-                apiUrl = '/api/tink/send';
-                bodyParam = 'command';
-            } else if (target === 'avr') {
-                apiUrl = '/api/avr/send';
-                bodyParam = 'command';
-            }
+            let apiUrl = '/api/switcher/send', bodyParam = 'message';
+            if (target === 'tink') { apiUrl = '/api/tink/send'; bodyParam = 'command'; }
+            else if (target === 'avr') { apiUrl = '/api/avr/send'; bodyParam = 'command'; }
 
             fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: bodyParam + '=' + encodeURIComponent(command)
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    appendToConsole('Error: ' + data.error, 'system');
-                }
-            })
-            .catch(err => {
-                appendToConsole('Failed to send command', 'system');
-                console.error('Console send failed:', err);
-            });
+            .then(r => r.json())
+            .then(data => { if (data.error) appendToConsole('Error: ' + data.error, 'system'); })
+            .catch(() => appendToConsole('Failed to send command', 'system'));
 
-            // Clear input
             input.value = '';
-
             return false;
         }
 
         function quickConsoleCommand(cmd, target) {
             document.getElementById('console-input').value = cmd;
-            if (target) {
-                document.getElementById('console-target').value = target;
-            }
+            if (target) document.getElementById('console-target').value = target;
             sendConsoleCommand(new Event('submit'), target);
         }
 
@@ -379,32 +340,19 @@
             .then(r => r.json())
             .then(logData => {
                 if (logData.logs && logData.logs.length > 0) {
-                    logData.logs.forEach(log => {
-                        appendToConsole(log.msg, getLogType(log.lvl), log.ts);
-                    });
+                    logData.logs.forEach(log => appendToConsole(log.msg, getLogType(log.lvl), log.ts));
                     lastLogCount = logData.total;
                 }
             })
-            .catch(err => {
-                console.error('Failed to refresh console:', err);
-            })
-            .finally(() => {
-                scheduleRefresh();
-            });
+            .catch(() => {})
+            .finally(() => scheduleRefresh());
         }
 
         function clearConsole() {
-            const consoleOutput = document.getElementById('console-output');
-            consoleOutput.innerHTML = '<span style="color: #569cd6;">TinkLink-USB Serial Console</span>\n<span style="color: #6a9955;">Ready. Type commands below and press Enter to send.</span>\n\n';
-
-            // Clear server-side log buffer
-            fetch('/api/logs?clear=1')
-            .then(() => {
-                lastLogCount = 0;
-            })
-            .catch(err => {
-                console.error('Failed to clear logs:', err);
-            });
+            document.getElementById('console-output').innerHTML =
+                '<span style="color: #569cd6;">TinkLink-USB Serial Console</span>\n' +
+                '<span style="color: #6a9955;">Ready. Type commands below and press Enter to send.</span>\n\n';
+            fetch('/api/logs?clear=1').then(() => { lastLogCount = 0; }).catch(() => {});
         }
 
         function escapeHtml(text) {
@@ -413,87 +361,61 @@
             return div.innerHTML;
         }
 
-        // OTA Upload functions
+        // OTA Upload
         function uploadOTA(event, mode) {
             event.preventDefault();
-
             const fileInput = document.getElementById(mode === 'firmware' ? 'firmware-file' : 'fs-file');
             const file = fileInput.files[0];
+            if (!file) { showMessage('Please select a file', 'error'); return false; }
 
-            if (!file) {
-                showMessage('Please select a file', 'error');
-                return false;
-            }
-
-            // Confirm before upload
             const typeLabel = mode === 'firmware' ? 'firmware' : 'filesystem';
-            if (!confirm(`Upload ${typeLabel} update?\n\nFile: ${file.name}\nSize: ${(file.size / 1024).toFixed(1)} KB\n\nDevice will reboot after successful update.`)) {
-                return false;
-            }
+            if (!confirm(`Upload ${typeLabel} update?\n\nFile: ${file.name}\nSize: ${(file.size / 1024).toFixed(1)} KB\n\nDevice will reboot after successful update.`)) return false;
 
-            // Show progress UI
             const progressDiv = document.getElementById('ota-progress');
             const progressBar = document.getElementById('ota-progress-bar');
             const statusText = document.getElementById('ota-status');
             progressDiv.style.display = 'block';
             progressBar.style.width = '0%';
+            progressBar.style.background = '#00d4ff';
             statusText.textContent = 'Starting upload...';
-
-            // Disable buttons during upload
             document.getElementById('firmware-upload-btn').disabled = true;
             document.getElementById('fs-upload-btn').disabled = true;
 
-            // Create form data
             const formData = new FormData();
             formData.append('file', file);
             formData.append('mode', mode);
 
-            // Upload with progress tracking
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/api/ota/upload', true);
-
             xhr.upload.onprogress = function(e) {
                 if (e.lengthComputable) {
-                    const percent = Math.round((e.loaded / e.total) * 100);
-                    progressBar.style.width = percent + '%';
-                    statusText.textContent = `Uploading: ${percent}% (${(e.loaded / 1024).toFixed(0)} / ${(e.total / 1024).toFixed(0)} KB)`;
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    progressBar.style.width = pct + '%';
+                    statusText.textContent = `Uploading: ${pct}% (${(e.loaded / 1024).toFixed(0)} / ${(e.total / 1024).toFixed(0)} KB)`;
                 }
             };
-
             xhr.onload = function() {
                 if (xhr.status === 200) {
                     progressBar.style.width = '100%';
                     progressBar.style.background = '#28a745';
-                    statusText.textContent = 'Update successful! Device is rebooting...';
-                    showMessage('Update successful! Reconnect in a few seconds.', 'success');
-
-                    // Wait and reload page
-                    setTimeout(() => {
-                        statusText.textContent = 'Reconnecting...';
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 5000);
-                    }, 2000);
+                    statusText.textContent = 'Update successful! Rebooting...';
+                    showMessage('Update successful! Reconnecting...', 'success');
+                    setTimeout(() => { statusText.textContent = 'Reconnecting...'; setTimeout(() => window.location.reload(), 5000); }, 2000);
                 } else {
-                    let errorMsg = 'Update failed';
-                    try {
-                        const response = JSON.parse(xhr.responseText);
-                        if (response.error) errorMsg = response.error;
-                    } catch (e) {}
+                    let msg = 'Update failed';
+                    try { msg = JSON.parse(xhr.responseText).error || msg; } catch(e) {}
                     progressBar.style.background = '#dc3545';
-                    statusText.textContent = 'Error: ' + errorMsg;
-                    showMessage('Update failed: ' + errorMsg, 'error');
+                    statusText.textContent = 'Error: ' + msg;
+                    showMessage('Update failed: ' + msg, 'error');
                     resetOtaUI();
                 }
             };
-
             xhr.onerror = function() {
                 progressBar.style.background = '#dc3545';
                 statusText.textContent = 'Upload failed - connection error';
                 showMessage('Upload failed - connection error', 'error');
                 resetOtaUI();
             };
-
             xhr.send(formData);
             return false;
         }
@@ -503,50 +425,19 @@
             document.getElementById('fs-upload-btn').disabled = false;
         }
 
-        function rebootDevice() {
-            if (!confirm('Reboot the device?')) return;
-            fetch('/api/system/reboot', { method: 'POST' })
-            .then(r => r.json())
-            .then(() => {
-                showMessage('Rebooting... Reconnecting in 5 seconds.', 'success');
-                setTimeout(() => window.location.reload(), 5000);
-            })
-            .catch(() => {
-                // Connection drops immediately on reboot — that's expected
-                showMessage('Rebooting... Reconnecting in 5 seconds.', 'success');
-                setTimeout(() => window.location.reload(), 5000);
-            });
-        }
-
-        // Initialize on page load
+        // Init
         window.addEventListener('load', () => {
             document.getElementById('console-input').focus();
-
-            // Fetch version
-            fetch('/api/status')
-            .then(r => r.json())
-            .then(data => {
+            fetch('/api/status').then(r => r.json()).then(data => {
                 document.getElementById('version').textContent = 'v' + data.version;
             });
-
-            // Load recent logs to show startup messages, then start polling
-            fetch('/api/logs?count=50')
-            .then(r => r.json())
-            .then(data => {
+            fetch('/api/logs?count=50').then(r => r.json()).then(data => {
                 if (data.logs && data.logs.length > 0) {
-                    data.logs.forEach(log => {
-                        appendToConsole(log.msg, getLogType(log.lvl), log.ts);
-                    });
+                    data.logs.forEach(log => appendToConsole(log.msg, getLogType(log.lvl), log.ts));
                     lastLogCount = data.total;
                 }
-                // Start live updates only after initial load completes
                 scheduleRefresh();
-            })
-            .catch(err => {
-                console.error('Failed to load initial logs:', err);
-                // Start polling even if initial load fails
-                scheduleRefresh();
-            });
+            }).catch(() => scheduleRefresh());
         });
     </script>
 </body>
