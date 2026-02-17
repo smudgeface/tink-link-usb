@@ -1,6 +1,6 @@
 # TinkLink-USB
 
-> **Current Version**: 1.9.4
+> **Current Version**: 1.9.5
 
 An ESP32-based bridge between video switchers and the RetroTINK 4K.
 
@@ -33,11 +33,12 @@ The original [TinkLink](https://github.com/Patrick-Working/tink-link) project us
 - **Web Interface** - Monitor status, configure WiFi, manage input triggers, and configure AVR settings from any browser
 - **Trigger Configuration** - Web-based interface to create and edit switcher input to RetroTINK profile mappings
 - **System Console** - Web-based debug console with live log streaming and command sending to switcher, RetroTINK, or AVR
-- **OTA Updates** - Update firmware and filesystem over WiFi (no USB required)
+- **OTA Updates** - Update firmware and filesystem over WiFi with automatic config backup/restore (no USB required)
+- **Config Backup & Restore** - Back up and restore all device settings via REST API; OTA filesystem uploads automatically preserve configuration
 - **Centralized Logging** - Debug logs with timestamps accessible via web interface and `scripts/logs.py`
 - **WiFi Resilience** - Automatic retry with exponential backoff, AP fallback with periodic reconnection to saved network, and proper DHCP hostname registration
 - **mDNS Support** - Access via `http://tinklink.local`
-- **Persistent Configuration** - Settings stored in flash via LittleFS
+- **Live Configuration** - All settings apply immediately without reboot; stored in flash via LittleFS
 
 ## Hardware Requirements
 
@@ -389,9 +390,10 @@ The web interface provides comprehensive configuration and monitoring capabiliti
 
 **Debug Page** (`/debug.html`)
 - System console with live log updates and timestamps
-- Send commands to switcher or RetroTINK
+- Send commands to switcher, RetroTINK, or AVR
 - LED color testing
 - OTA firmware and filesystem updates
+- System reboot button
 
 **API Documentation** (`/api.html`)
 - Complete REST API reference
@@ -490,6 +492,15 @@ tink-link-usb/
 ```
 
 ## Changelog
+
+### v1.9.5 — Live Config, Reboot API & Config Backup
+
+- **SSDP discovery fix** — Fixed Denon/Marantz AVR discovery failure caused by using `beginMulticast()` for SSDP M-SEARCH. SSDP responses are unicast, so the multicast-bound socket never received them. Switched to a regular UDP socket that can send to the multicast group and receive unicast replies.
+- **Live AVR configuration** — Enabling or disabling the AVR now takes effect immediately without a reboot. The AVR instance is created or destroyed at runtime via a pointer-to-pointer pattern. All user-facing configuration (WiFi, triggers, AVR) now applies live.
+- **Reboot API** — New `POST /api/system/reboot` endpoint for remote device restart. Reboot button added to the debug page with confirmation dialog.
+- **Config backup & restore** — New `GET /api/config/backup` and `POST /api/config/restore` endpoints to download and restore all device settings (WiFi credentials, triggers, AVR config) as a single JSON object.
+- **Safe filesystem OTA** — The `ota_upload.py` script now automatically backs up device configuration before filesystem uploads and restores it after reboot, preventing settings loss.
+- **Improved error messages** — AVR API endpoints now return actionable error messages (e.g., "AVR is disabled. Enable it in Config.") instead of generic errors.
 
 ### v1.9.3 — WiFi Resilience & DHCP Hostname
 

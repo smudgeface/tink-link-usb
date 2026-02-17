@@ -311,20 +311,40 @@ Visit `http://tinklink.local/config.html` to edit WiFi settings via the web UI. 
    # or for ESP32-C3:
    pio run -e esp32c3 -t uploadfs
    ```
-3. Reboot the device for changes to take effect
+
+**Note:** The `ota_upload.py` script automatically backs up and restores device configuration during filesystem uploads, so runtime settings (WiFi credentials, triggers, AVR config) are preserved.
 
 ### 3. API Endpoints
 
-Use the REST API to modify configuration programmatically:
+Use the REST API to modify configuration programmatically. All changes take effect immediately — no reboot required.
 
-- `POST /api/config/wifi` — Update WiFi credentials
-- `POST /api/config/switcher` — Update switcher settings
-- `POST /api/config/tink` — Update RetroTINK settings
+- `POST /api/wifi/connect` — Connect to WiFi network
 - `POST /api/config/triggers` — Update trigger mappings
-- `POST /api/config/avr` — Update AVR settings
+- `POST /api/config/avr` — Update AVR settings (enable/disable, IP, input)
+- `GET /api/config/backup` — Download all config as JSON
+- `POST /api/config/restore` — Restore config from backup JSON (reboot to apply)
+- `POST /api/system/reboot` — Reboot the device
 
 See `http://tinklink.local/api.html` for complete API documentation.
 
 ---
 
-**Last Updated:** 2026-02-15 (v1.9.3)
+## Live Configuration
+
+All user-facing settings apply immediately when changed via the web interface or REST API — no reboot is required.
+
+| Setting | Live? | Notes |
+|---------|-------|-------|
+| WiFi credentials | ✅ | Connects to new network immediately |
+| Triggers | ✅ | Reloads into RetroTink on save |
+| AVR enable/disable | ✅ | Creates or destroys AVR instance at runtime |
+| AVR settings (IP, input) | ✅ | Reconfigures live instance |
+| Switcher type | ❌ | Hardware config, set at boot |
+| RetroTink serial mode | ❌ | Hardware config, set at boot |
+| Pin assignments | ❌ | Hardware config, set at boot |
+
+Hardware-level settings (switcher type, serial mode, pins) only apply at boot since they represent physical hardware that doesn't change at runtime. These are typically set once during initial setup.
+
+---
+
+**Last Updated:** 2026-02-16 (v1.9.5)

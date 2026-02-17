@@ -6,7 +6,7 @@ This document provides guidelines and conventions for Claude (AI assistant) when
 
 TinkLink-USB is an ESP32-S3 USB bridge between video switchers and the RetroTINK 4K. It automatically triggers RetroTINK profile changes when video switcher inputs change.
 
-**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, and SSDP discovery all functional. Version 1.9.3.
+**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, SSDP discovery, config backup/restore, and reboot API all functional. Version 1.9.5.
 
 **Tech Stack:**
 - Platform: ESP32-S3 (Arduino framework, USB OTG mode)
@@ -165,10 +165,11 @@ APIs are organized by resource:
 /api/tink/*              - RetroTINK operations
 /api/switcher/*          - Video switcher operations
 /api/avr/*               - Denon/Marantz AVR operations
-/api/config/avr          - AVR configuration
+/api/config/*            - Configuration (triggers, AVR, backup/restore)
 /api/debug/*             - Debug utilities
 /api/logs                - System logs
 /api/ota/*               - OTA updates
+/api/system/reboot       - Device reboot
 ```
 
 ### Response Format
@@ -215,6 +216,8 @@ Configuration is split into two JSON files in LittleFS:
   "hostname": "tinklink"
 }
 ```
+
+**Important:** `data/wifi.json` is gitignored and must exist locally with your WiFi credentials. It gets baked into the LittleFS image on every filesystem build. Without it, the device will boot into AP mode.
 
 ### Modular Design
 
@@ -283,6 +286,7 @@ Before committing significant changes:
 4. Update web UI if needed
 5. Update default `data_c3/config.json` if the option applies to ESP32-C3
 6. Update `CONFIGURATION.md` with the new field (type, defaults, description)
+7. **Ensure the API handler applies the change live** — all user-facing config must take effect without a reboot. If the config controls an object lifecycle (create/destroy), use the pointer-to-pointer pattern (see `DenonAvr**` in WebServer).
 
 ### Changing Pin Assignments
 
@@ -361,7 +365,7 @@ tink-link-usb/
 │   ├── api.html       # API documentation
 │   ├── style.css      # Global styles
 │   ├── config.json    # Default configuration
-│   └── wifi.json      # WiFi credentials template
+│   └── wifi.json      # WiFi credentials (gitignored, must exist locally)
 ├── src/               # Application source code
 │   ├── main.cpp       # Entry point
 │   ├── WebServer.*    # HTTP server & API handlers
@@ -415,6 +419,17 @@ tink-link-usb/
 - **HEOS CLI Protocol Specification**: assets/docs/HEOS_CLI_Protocol_Specification.pdf
 - **Denon AVR Network Ports**: https://manuals.denon.com/EUsecurity/EU/EN/index.php
 
+### Live Configuration
+
+All user-facing configuration changes must apply immediately without requiring a reboot:
+
+- **WiFi** — `connect()` applies immediately
+- **Triggers** — Clears and reloads into RetroTink on save
+- **AVR enable/disable** — Creates or destroys instance at runtime via `DenonAvr**` pointer-to-pointer
+- **AVR settings** (IP, input) — Reconfigures live instance
+
+Hardware-level settings (switcher type, RetroTink serial mode, pin assignments) are boot-only since they represent physical hardware that doesn't change at runtime.
+
 ---
 
-**Last Updated**: 2026-02-15 (v1.9.3)
+**Last Updated**: 2026-02-16 (v1.9.5)
