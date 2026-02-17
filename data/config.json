@@ -19,8 +19,8 @@
     },
     "avr": {
         "type": "Denon X4300H",
-        "enabled": false,
-        "ip": "",
+        "enabled": true,
+        "ip": "192.168.20.65",
         "input": "GAME"
     },
     "hostname": "tinklink",
