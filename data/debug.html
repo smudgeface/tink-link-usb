@@ -104,10 +104,8 @@
             <p style="font-size: 0.9em; color: #888; margin-bottom: 15px;">
                 Backup or restore all device settings (WiFi, triggers, AVR) as a JSON file.
             </p>
-            <div style="display: flex; gap: 10px;">
-                <button onclick="downloadBackup()" style="flex: 1;">Download Backup</button>
-                <button onclick="document.getElementById('restore-file').click()" class="secondary" style="flex: 1;">Restore Backup</button>
-            </div>
+            <button onclick="downloadBackup()" style="width: 100%; margin-bottom: 8px;">Download Backup</button>
+            <button onclick="document.getElementById('restore-file').click()" class="secondary" style="width: 100%;">Restore from File</button>
             <input type="file" id="restore-file" accept=".json" style="display: none;" onchange="restoreBackup(this)">
         </div>
 
