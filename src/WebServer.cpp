@@ -16,7 +16,7 @@ WebServer::WebServer(uint16_t port)
     , _config(nullptr)
     , _switcher(nullptr)
     , _tink(nullptr)
-    , _avr(nullptr)
+    , _avrPtr(nullptr)
     , _otaMode(OTAMode::FIRMWARE)
     , _otaProgress(0)
     , _otaTotal(0)
@@ -29,12 +29,12 @@ WebServer::~WebServer() {
     delete _server;
 }
 
-void WebServer::begin(WifiManager* wifi, ConfigManager* config, Switcher* switcher, RetroTink* tink, DenonAvr* avr) {
+void WebServer::begin(WifiManager* wifi, ConfigManager* config, Switcher* switcher, RetroTink* tink, DenonAvr** avr) {
     _wifi = wifi;
     _config = config;
     _switcher = switcher;
     _tink = tink;
-    _avr = avr;
+    _avrPtr = avr;
 
     setupRoutes();
     _server->begin();
@@ -202,15 +202,15 @@ void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
     doc["tink"]["lastCommand"] = _tink->getLastCommand();
 
     // AVR status
-    if (_avr) {
+    if (avr()) {
         auto avrConfig = _config->getAvrConfig();
         doc["avr"]["type"] = avrConfig["type"] | "Denon X4300H";
         doc["avr"]["enabled"] = true;  // AVR exists, so it's enabled
-        doc["avr"]["connected"] = _avr->isConnected();
+        doc["avr"]["connected"] = avr()->isConnected();
         doc["avr"]["ip"] = avrConfig["ip"] | "";
-        doc["avr"]["input"] = _avr->getInput();
-        doc["avr"]["lastCommand"] = _avr->getLastCommand();
-        doc["avr"]["lastResponse"] = _avr->getLastResponse();
+        doc["avr"]["input"] = avr()->getInput();
+        doc["avr"]["lastCommand"] = avr()->getLastCommand();
+        doc["avr"]["lastResponse"] = avr()->getLastResponse();
     } else {
         doc["avr"]["enabled"] = false;
     }
@@ -667,8 +667,8 @@ void WebServer::handleOtaUpload(AsyncWebServerRequest* request, String filename,
 }
 
 void WebServer::handleApiAvrSend(AsyncWebServerRequest* request) {
-    if (!_avr) {
-        request->send(500, "application/json", "{\"error\":\"AVR not configured\"}");
+    if (!avr()) {
+        request->send(400, "application/json", "{\"error\":\"AVR is disabled. Enable it in Config.\"}");
         return;
     }
 
@@ -682,14 +682,9 @@ void WebServer::handleApiAvrSend(AsyncWebServerRequest* request) {
         return;
     }
 
-    if (!_avr) {
-        request->send(400, "application/json", "{\"error\":\"AVR control is disabled\"}");
-        return;
-    }
-
     LOG_DEBUG("WebServer: AVR command: %s", command.c_str());
 
-    bool sent = _avr->sendRawCommand(command);
+    bool sent = avr()->sendRawCommand(command);
 
     JsonDocument doc;
     doc["status"] = sent ? "ok" : "error";
@@ -704,15 +699,15 @@ void WebServer::handleApiAvrSend(AsyncWebServerRequest* request) {
 }
 
 void WebServer::handleApiAvrDiscover(AsyncWebServerRequest* request) {
-    if (!_avr) {
-        request->send(500, "application/json", "{\"error\":\"AVR not configured\"}");
+    if (!avr()) {
+        request->send(400, "application/json", "{\"error\":\"AVR is disabled. Enable it in Config.\"}");
         return;
     }
 
     JsonDocument doc;
 
-    if (_avr->isDiscoveryComplete()) {
-        auto devices = _avr->getDiscoveryResults();
+    if (avr()->isDiscoveryComplete()) {
+        auto devices = avr()->getDiscoveryResults();
 
         doc["status"] = "complete";
         JsonArray devicesArray = doc["devices"].to<JsonArray>();
@@ -724,9 +719,9 @@ void WebServer::handleApiAvrDiscover(AsyncWebServerRequest* request) {
         }
 
         // Start a new scan for the next poll
-        _avr->startDiscovery();
+        avr()->startDiscovery();
     } else {
-        _avr->startDiscovery(); // Start if not already running
+        avr()->startDiscovery(); // Start if not already running
         doc["status"] = "discovering";
         doc["devices"] = JsonArray();
     }
@@ -777,15 +772,26 @@ void WebServer::handleApiConfigAvr(AsyncWebServerRequest* request) {
     _config->setAvrConfig(newConfig);
 
     if (_config->saveConfig()) {
-        // Reconfigure live instance
-        if (_avr) {
-            _avr->configure(newConfig);
-            _avr->begin();
+        bool enabled = newConfig["enabled"].as<bool>();
+
+        if (enabled && _avrPtr) {
+            // Create or reconfigure AVR instance
+            if (!avr()) {
+                *_avrPtr = new DenonAvr();
+                LOG_INFO("WebServer: Created AVR instance");
+            }
+            avr()->configure(newConfig);
+            avr()->begin();
+        } else if (!enabled && _avrPtr && avr()) {
+            // Destroy AVR instance
+            delete *_avrPtr;
+            *_avrPtr = nullptr;
+            LOG_INFO("WebServer: Destroyed AVR instance");
         }
 
         request->send(200, "application/json", "{\"status\":\"ok\"}");
         LOG_INFO("WebServer: AVR config saved (enabled: %s, ip: %s, input: %s)",
-                 newConfig["enabled"].as<bool>() ? "yes" : "no",
+                 enabled ? "yes" : "no",
                  newConfig["ip"].as<const char*>(),
                  newConfig["input"].as<const char*>());
     } else {

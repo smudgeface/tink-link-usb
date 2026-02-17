@@ -231,7 +231,7 @@ void setup() {
 
     // Initialize web server
     LOG_INFO("[6/6] Starting web server...");
-    webServer.begin(&wifiManager, &configManager, switcher, tink, avr);
+    webServer.begin(&wifiManager, &configManager, switcher, tink, &avr);
     webServer.setLEDCallback(setLEDColor);
 
     LOG_RAW("\n");

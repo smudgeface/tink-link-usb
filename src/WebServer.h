@@ -67,7 +67,7 @@ public:
      * @param tink RetroTINK controller for commands
      * @param avr Denon AVR controller (nullptr if not used)
      */
-    void begin(WifiManager* wifi, ConfigManager* config, Switcher* switcher, RetroTink* tink, DenonAvr* avr = nullptr);
+    void begin(WifiManager* wifi, ConfigManager* config, Switcher* switcher, RetroTink* tink, DenonAvr** avr = nullptr);
 
     /** Stop the web server. */
     void end();
@@ -84,7 +84,8 @@ private:
     ConfigManager* _config;
     Switcher* _switcher;
     RetroTink* _tink;
-    DenonAvr* _avr;
+    DenonAvr** _avrPtr;  // Pointer-to-pointer so we can create/destroy at runtime
+    DenonAvr* avr() const { return _avrPtr ? *_avrPtr : nullptr; }
     LEDControlCallback _ledCallback;
 
     // OTA state
