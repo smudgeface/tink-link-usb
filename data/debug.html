@@ -77,9 +77,9 @@
             <div style="margin-bottom: 20px;">
                 <h3 style="font-size: 1em; margin-bottom: 10px;">Firmware (.bin)</h3>
                 <form id="ota-firmware-form" onsubmit="return uploadOTA(event, 'firmware')">
-                    <input type="file" id="firmware-file" accept=".bin" style="width: 100%; margin-bottom: 8px;">
-                    <div class="btn-row" style="margin-top: 0;">
-                        <button type="submit" id="firmware-upload-btn">Upload Firmware</button>
+                    <div class="btn-row" style="margin-top: 0; align-items: center;">
+                        <input type="file" id="firmware-file" accept=".bin" style="flex: 1; min-width: 0;">
+                        <button type="submit" id="firmware-upload-btn">Upload</button>
                     </div>
                 </form>
             </div>
@@ -87,9 +87,9 @@
             <div style="margin-bottom: 20px;">
                 <h3 style="font-size: 1em; margin-bottom: 10px;">Filesystem (.bin)</h3>
                 <form id="ota-fs-form" onsubmit="return uploadOTA(event, 'fs')">
-                    <input type="file" id="fs-file" accept=".bin" style="width: 100%; margin-bottom: 8px;">
-                    <div class="btn-row" style="margin-top: 0;">
-                        <button type="submit" id="fs-upload-btn">Upload Filesystem</button>
+                    <div class="btn-row" style="margin-top: 0; align-items: center;">
+                        <input type="file" id="fs-file" accept=".bin" style="flex: 1; min-width: 0;">
+                        <button type="submit" id="fs-upload-btn">Upload</button>
                     </div>
                 </form>
             </div>
