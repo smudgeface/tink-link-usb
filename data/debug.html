@@ -98,13 +98,17 @@
             </div>
         </div>
 
-        <!-- Config Backup -->
+        <!-- Config Backup & Restore -->
         <div class="card">
-            <h2>Config Backup</h2>
+            <h2>Configuration</h2>
             <p style="font-size: 0.9em; color: #888; margin-bottom: 15px;">
-                Download all device settings (WiFi, triggers, AVR) as a JSON file.
+                Backup or restore all device settings (WiFi, triggers, AVR) as a JSON file.
             </p>
-            <button onclick="downloadBackup()" style="width: 100%;">Download Backup</button>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="downloadBackup()" style="flex: 1;">Download Backup</button>
+                <button onclick="document.getElementById('restore-file').click()" class="secondary" style="flex: 1;">Restore Backup</button>
+            </div>
+            <input type="file" id="restore-file" accept=".json" style="display: none;" onchange="restoreBackup(this)">
         </div>
 
         <!-- LED Tester -->
@@ -235,6 +239,39 @@
                 showMessage('Backup downloaded', 'success');
             })
             .catch(() => showMessage('Failed to download backup', 'error'));
+        }
+
+        function restoreBackup(input) {
+            const file = input.files[0];
+            if (!file) return;
+            if (!confirm(`Restore config from "${file.name}"?\n\nThis will overwrite all current settings. Device will reboot to apply.`)) {
+                input.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                let data;
+                try { data = JSON.parse(e.target.result); }
+                catch(err) { showMessage('Invalid JSON file', 'error'); input.value = ''; return; }
+
+                fetch('/api/config/restore', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                })
+                .then(r => r.json())
+                .then(resp => {
+                    if (resp.error) { showMessage('Restore failed: ' + resp.error, 'error'); }
+                    else {
+                        showMessage('Config restored! Rebooting...', 'success');
+                        fetch('/api/system/reboot', { method: 'POST' }).catch(() => {});
+                        setTimeout(() => window.location.reload(), 6000);
+                    }
+                })
+                .catch(() => showMessage('Restore failed - connection error', 'error'));
+                input.value = '';
+            };
+            reader.readAsText(file);
         }
 
         // Reboot
