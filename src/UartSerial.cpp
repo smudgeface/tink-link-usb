@@ -22,6 +22,19 @@ bool UartSerial::initTransport() {
     return true;
 }
 
+bool UartSerial::setBaudRate(uint32_t baud) {
+    if (baud < MIN_BAUD || baud > MAX_BAUD) {
+        return false;
+    }
+
+    _baud = baud;
+    if (_initialized) {
+        _hwSerial.updateBaudRate(baud);
+    }
+    LOG_DEBUG("UartSerial: Baud rate set to %lu", (unsigned long)baud);
+    return true;
+}
+
 void UartSerial::update() {
     // No-op: HardwareSerial is interrupt-driven
 }

@@ -42,6 +42,21 @@ public:
     size_t available() const override;  // Note: calls non-const HardwareSerial method
 
     /**
+     * Change the baud rate, applied immediately if the UART is running.
+     * @param baud New baud rate (MIN_BAUD to MAX_BAUD)
+     * @return false if the rate is out of range
+     */
+    bool setBaudRate(uint32_t baud) override;
+
+    /** @return Configured baud rate */
+    uint32_t getBaudRate() const override { return _baud; }
+
+    /** Lowest supported baud rate */
+    static const uint32_t MIN_BAUD = 300;
+    /** Highest supported baud rate (ESP32 UART limit) */
+    static const uint32_t MAX_BAUD = 5000000;
+
+    /**
      * Stop UART and release resources.
      */
     void end();

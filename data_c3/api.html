@@ -44,6 +44,11 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        .api-note {
+            color: #888;
+            font-size: 0.85em;
+            margin-bottom: 8px;
+        }
         .param-table {
             width: 100%;
             font-size: 0.85em;
@@ -85,6 +90,14 @@
             overflow-x: auto;
             white-space: pre;
             line-height: 1.4;
+        }
+        code {
+            background: #0f0f23;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .api-endpoint code, .api-example code {
+            background: #1a1a2e;
         }
         .try-btn {
             font-size: 0.7em;
@@ -134,27 +147,32 @@
         <nav>
             <a href="/">Status</a>
             <a href="/config.html">Config</a>
-            <a href="/debug.html">Debug</a>
+            <a href="/debug.html">System</a>
             <a href="/api.html" class="active">API</a>
         </nav>
 
         <div class="card">
             <h2>REST API Reference</h2>
+            <p style="color: #888; font-size: 0.9em; margin-bottom: 10px;">
+                All endpoints return JSON. POST endpoints take <code>application/x-www-form-urlencoded</code> parameters,
+                except <code>/api/config/restore</code> (JSON body) and <code>/api/ota/upload</code> (<code>multipart/form-data</code>).
+            </p>
             <p style="color: #888; font-size: 0.9em; margin-bottom: 15px;">
-                All endpoints return JSON. POST requests accept <code style="background: #0f0f23; padding: 2px 6px; border-radius: 3px;">application/x-www-form-urlencoded</code> parameters.
-                All successful responses include <code style="background: #0f0f23; padding: 2px 6px; border-radius: 3px;">"status": "ok"</code>.
+                Successful POST responses include <code>"status": "ok"</code>.
+                Errors return an HTTP 4xx/5xx status with <code>{ "error": "..." }</code>.
             </p>
 
             <div class="toc">
                 <a href="#status">Status</a>
                 <a href="#wifi">WiFi</a>
-                <a href="#config">Config</a>
+                <a href="#config">Configuration</a>
                 <a href="#tink">RetroTINK</a>
                 <a href="#avr">AVR</a>
                 <a href="#switcher">Switcher</a>
                 <a href="#debug">Debug</a>
                 <a href="#logs">Logs</a>
                 <a href="#ota">OTA</a>
+                <a href="#system">System</a>
                 <a href="#examples">Examples</a>
             </div>
 
@@ -169,16 +187,17 @@
                 <span class="api-method get">GET</span>
                 <span class="api-path">/api/status</span>
                 <button class="secondary try-btn" onclick="tryApi('GET', '/api/status')">Try</button>
-                <p class="api-desc">Get system status including WiFi, switcher, RetroTINK, and trigger configuration.</p>
+                <p class="api-desc">Get system status: WiFi, switcher, RetroTINK, AVR, and trigger mappings.</p>
                 <div class="api-section">
                     <h4>Response</h4>
                     <div class="api-example">{
-  "version": "1.8.0",
+  "version": "1.12.0",
   "wifi": {
     "connected": true,
     "ssid": "MyNetwork",
     "ip": "192.168.1.100",
     "rssi": -65,
+    "hostname": "tinklink",
     "state": "connected",
     "mode": "sta"
   },
@@ -194,16 +213,21 @@
   "avr": {
     "type": "Denon X4300H",
     "enabled": true,
-    "connected": false,
-    "ip": "192.168.1.100",
-    "input": "GAME",
-    "lastCommand": "SIGAME",
-    "lastResponse": "SIGAME"
+    "connected": true,
+    "ip": "192.168.1.50",
+    "input": "DVD",
+    "lastCommand": "SIDVD",
+    "lastResponse": "SIDVD"
   },
   "triggers": [
     { "input": 1, "profile": 1, "mode": "SVS", "name": "NES" }
   ]
-}</div>
+}
+
+// wifi.state:      disconnected, connecting, connected, failed, ap_active
+// wifi.mode:       sta, ap, ap_sta (ap_ssid and ap_ip are added while the access point is active)
+// tink.powerState: unknown, waking, booting, on, sleeping
+// avr:             only { "enabled": false } when AVR control is disabled</div>
                 </div>
             </div>
         </div>
@@ -216,7 +240,7 @@
                 <span class="api-method get">GET</span>
                 <span class="api-path">/api/wifi/scan</span>
                 <button class="secondary try-btn" onclick="tryApi('GET', '/api/wifi/scan')">Try</button>
-                <p class="api-desc">Scan for available WiFi networks. First call starts scan, subsequent calls return results when ready.</p>
+                <p class="api-desc">Scan for WiFi networks. The first call starts a scan and returns <code>"status": "scanning"</code>; poll until <code>"status": "complete"</code>.</p>
                 <div class="api-section">
                     <h4>Response</h4>
                     <div class="api-example">{
@@ -232,7 +256,7 @@
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/wifi/connect</span>
-                <p class="api-desc">Connect to a WiFi network. Does not save credentials to flash.</p>
+                <p class="api-desc">Connect to a WiFi network without saving the credentials. The device uses this network until it reboots, then returns to the saved network.</p>
                 <div class="api-section">
                     <h4>Parameters</h4>
                     <table class="param-table">
@@ -245,7 +269,7 @@
                         <tr>
                             <td><span class="param-name">password</span></td>
                             <td><span class="param-type">string</span></td>
-                            <td>Network password (optional for open networks)</td>
+                            <td>Network password (omit for open networks)</td>
                         </tr>
                     </table>
                 </div>
@@ -258,8 +282,7 @@
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/wifi/disconnect</span>
-                <button class="secondary try-btn" onclick="tryApi('POST', '/api/wifi/disconnect')">Try</button>
-                <p class="api-desc">Disconnect from current WiFi network.</p>
+                <p class="api-desc">Disconnect from the current network. The device stays disconnected until it reboots or <code>/api/wifi/connect</code> is called, so you lose access if you're connected over WiFi. Has no effect in access point mode.</p>
                 <div class="api-section">
                     <h4>Response</h4>
                     <div class="api-example">{ "status": "ok" }</div>
@@ -269,7 +292,7 @@
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/wifi/save</span>
-                <p class="api-desc">Save WiFi credentials to flash. Device will use these on boot.</p>
+                <p class="api-desc">Save WiFi credentials to flash for use on boot. Does not connect; call <code>/api/wifi/connect</code> as well to switch networks now.</p>
                 <div class="api-section">
                     <h4>Parameters</h4>
                     <table class="param-table">
@@ -296,11 +319,28 @@
         <!-- Config APIs -->
         <div class="card" id="config">
             <h2>Configuration</h2>
+            <p class="api-note">Changes made through these endpoints are saved to flash and take effect immediately, except <code>/api/config/restore</code>, which needs a reboot.</p>
+
+            <div class="api-endpoint">
+                <span class="api-method get">GET</span>
+                <span class="api-path">/api/config/triggers</span>
+                <button class="secondary try-btn" onclick="tryApi('GET', '/api/config/triggers')">Try</button>
+                <p class="api-desc">Get trigger mappings (switcher input to RetroTINK profile).</p>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "triggers": [
+    { "input": 1, "profile": 1, "mode": "SVS", "name": "NES" },
+    { "input": 2, "profile": 2, "mode": "Remote", "name": "SNES" }
+  ]
+}</div>
+                </div>
+            </div>
 
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/config/triggers</span>
-                <p class="api-desc">Update trigger mappings (switcher input to RetroTINK profile). Saves to flash and updates active configuration.</p>
+                <p class="api-desc">Replace all trigger mappings.</p>
                 <div class="api-section">
                     <h4>Parameters</h4>
                     <table class="param-table">
@@ -308,23 +348,180 @@
                         <tr>
                             <td><span class="param-name">triggers</span></td>
                             <td><span class="param-type">string</span></td>
-                            <td>JSON array of trigger objects<span class="param-required">required</span></td>
+                            <td>JSON array of trigger objects (the complete list)<span class="param-required">required</span></td>
                         </tr>
                     </table>
                 </div>
                 <div class="api-section">
-                    <h4>Trigger Object Format</h4>
+                    <h4>Trigger Object</h4>
+                    <table class="param-table">
+                        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+                        <tr>
+                            <td><span class="param-name">input</span></td>
+                            <td><span class="param-type">int</span></td>
+                            <td>Switcher input number (1 or higher)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">profile</span></td>
+                            <td><span class="param-type">int</span></td>
+                            <td>RetroTINK profile number (1 or higher)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">mode</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td><code>"SVS"</code> sends <code>SVS NEW INPUT=N</code>; <code>"Remote"</code> sends <code>remote profN</code>. Anything else is treated as SVS.</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">name</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>Display name</td>
+                        </tr>
+                    </table>
+                    <p class="api-note" style="margin-top: 8px;">Entries with an input or profile below 1 are dropped.</p>
+                </div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{ "status": "ok" }</div>
+                </div>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method get">GET</span>
+                <span class="api-path">/api/config/tink</span>
+                <button class="secondary try-btn" onclick="tryApi('GET', '/api/config/tink')">Try</button>
+                <p class="api-desc">Get RetroTINK serial settings.</p>
+                <div class="api-section">
+                    <h4>Response</h4>
                     <div class="api-example">{
-  "input": 1,        // Switcher input number (1-16)
-  "profile": 1,      // RetroTINK profile number (1-16)
-  "mode": "SVS",     // "SVS" or "Remote"
-  "name": "NES"      // Display name
-}</div>
+  "serialMode": "usb",
+  "powerManagementMode": "full",
+  "baudRate": 2000000,
+  "defaultBaudRate": 2000000
+}
+
+// serialMode:          usb or uart (set in config.json, applied at boot)
+// powerManagementMode: off, simple or full (set in config.json, applied at boot)
+// baudRate:            current serial baud rate
+// defaultBaudRate:     default for the serial mode (2000000 for usb, 115200 for uart)</div>
+                </div>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method post">POST</span>
+                <span class="api-path">/api/config/tink</span>
+                <p class="api-desc">Change the RetroTINK serial baud rate. Applies to the running connection immediately. Setting the serial mode's default rate removes the override from <code>config.json</code>.</p>
+                <div class="api-section">
+                    <h4>Parameters</h4>
+                    <table class="param-table">
+                        <tr><th>Name</th><th>Type</th><th>Description</th></tr>
+                        <tr>
+                            <td><span class="param-name">baudRate</span></td>
+                            <td><span class="param-type">int</span></td>
+                            <td>
+                                New baud rate<span class="param-required">required</span><br>
+                                USB: 300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600, 1000000, 1500000, 2000000, 3000000<br>
+                                UART: 300 to 5000000
+                            </td>
+                        </tr>
+                    </table>
                 </div>
                 <div class="api-section">
                     <h4>Response</h4>
                     <div class="api-example">{
-  "status": "ok"
+  "status": "ok",
+  "baudRate": 115200
+}</div>
+                </div>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method get">GET</span>
+                <span class="api-path">/api/config/avr</span>
+                <button class="secondary try-btn" onclick="tryApi('GET', '/api/config/avr')">Try</button>
+                <p class="api-desc">Get AVR configuration.</p>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "type": "Denon X4300H",
+  "enabled": true,
+  "ip": "192.168.1.50",
+  "input": "DVD"
+}</div>
+                </div>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method post">POST</span>
+                <span class="api-path">/api/config/avr</span>
+                <p class="api-desc">Update AVR configuration. Only the parameters provided are changed. Enabling or disabling creates or removes the AVR controller immediately.</p>
+                <div class="api-section">
+                    <h4>Parameters</h4>
+                    <table class="param-table">
+                        <tr><th>Name</th><th>Type</th><th>Description</th></tr>
+                        <tr>
+                            <td><span class="param-name">enabled</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td><code>"1"</code> or <code>"true"</code> to enable; anything else disables</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">ip</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>AVR IP address (e.g., "192.168.1.50")</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">input</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>Denon input source (e.g., "GAME", "SAT/CBL", "DVD")</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{ "status": "ok" }</div>
+                </div>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method get">GET</span>
+                <span class="api-path">/api/config/backup</span>
+                <button class="secondary try-btn" onclick="tryApi('GET', '/api/config/backup')">Try</button>
+                <p class="api-desc">Download all device configuration (<code>config.json</code> and <code>wifi.json</code>, including the WiFi password) as one JSON object. A filesystem OTA update replaces both files, so back up first.</p>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "version": "1.1",
+  "config": {
+    "switcher": { "type": "Extron SW VGA", "uartId": 1, "txPin": 43, "rxPin": 44, "autoSwitch": true },
+    "tink": { "serialMode": "usb", "powerManagementMode": "full", ... },
+    "hardware": { "ledPin": 21, "ledColorOrder": "RGB" },
+    "avr": { "type": "Denon X4300H", "enabled": true, "ip": "192.168.1.50", "input": "DVD" },
+    "hostname": "tinklink",
+    "triggers": [ ... ]
+  },
+  "wifi": {
+    "ssid": "MyNetwork",
+    "password": "...",
+    "hostname": "tinklink"
+  }
+}
+
+// version: backup format (MAJOR.MINOR), separate from the firmware version</div>
+                </div>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method post">POST</span>
+                <span class="api-path">/api/config/restore</span>
+                <p class="api-desc">Restore configuration from a backup. Overwrites <code>config.json</code> and <code>wifi.json</code> with the sections present in the backup. Reboot afterwards to apply. Backups with a newer major format version are rejected.</p>
+                <div class="api-section">
+                    <h4>Request Body</h4>
+                    <p class="api-note">Content-Type: <code>application/json</code>, the JSON object returned by <code>/api/config/backup</code>.</p>
+                </div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "status": "ok",
+  "message": "Config restored. Reboot to apply."
 }</div>
                 </div>
             </div>
@@ -337,7 +534,7 @@
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/tink/send</span>
-                <p class="api-desc">Send a command to RetroTINK 4K via USB Host serial. Command is framed with CR and sent at the configured baud rate (2,000,000 by default over USB).</p>
+                <p class="api-desc">Send a raw command to the RetroTINK 4K over the configured serial connection (USB or UART), framed as <code>\r&lt;command&gt;\r</code>. Replies from the RetroTINK (e.g. <code>[COM] Serial Remote: prof1</code>) appear in the system log. Returns ok even if the RetroTINK isn't connected; the command is then only logged.</p>
                 <div class="api-section">
                     <h4>Parameters</h4>
                     <table class="param-table">
@@ -345,7 +542,7 @@
                         <tr>
                             <td><span class="param-name">command</span></td>
                             <td><span class="param-type">string</span></td>
-                            <td>Command to send (e.g., "remote prof1", "SVS NEW INPUT=1")<span class="param-required">required</span></td>
+                            <td>Command to send (e.g., "remote prof1", "SVS NEW INPUT=1", "pwr on")<span class="param-required">required</span></td>
                         </tr>
                     </table>
                 </div>
@@ -362,77 +559,28 @@
         <!-- AVR APIs -->
         <div class="card" id="avr">
             <h2>AVR</h2>
-
-            <div class="api-endpoint">
-                <span class="api-method get">GET</span>
-                <span class="api-path">/api/config/avr</span>
-                <button class="secondary try-btn" onclick="tryApi('GET', '/api/config/avr')">Try</button>
-                <p class="api-desc">Get current AVR configuration.</p>
-                <div class="api-section">
-                    <h4>Response</h4>
-                    <div class="api-example">{
-  "type": "Denon X4300H",
-  "enabled": true,
-  "ip": "192.168.1.100",
-  "input": "GAME"
-}</div>
-                </div>
-            </div>
+            <p class="api-note">AVR configuration is under <a href="#config" style="color: #00d4ff;">Configuration</a>. These endpoints return 400 while AVR control is disabled.</p>
 
             <div class="api-endpoint">
                 <span class="api-method get">GET</span>
                 <span class="api-path">/api/avr/discover</span>
                 <button class="secondary try-btn" onclick="tryApi('GET', '/api/avr/discover')">Try</button>
-                <p class="api-desc">Discover Denon/Marantz AVR receivers on the local network via SSDP (UPnP multicast on port 1900). First call starts discovery, subsequent calls return results when ready.</p>
+                <p class="api-desc">Discover Denon/Marantz AVR receivers on the local network via SSDP (UPnP multicast on port 1900). The first call starts discovery and returns <code>"status": "discovering"</code>; poll until <code>"status": "complete"</code>.</p>
                 <div class="api-section">
                     <h4>Response</h4>
                     <div class="api-example">{
   "status": "complete",
   "devices": [
-    { "ip": "192.168.1.100", "name": "Denon AVR-X4300H" }
+    { "ip": "192.168.1.50", "name": "Denon AVR-X4300H" }
   ]
-}
-
-// status: "discovering" while scan is in progress
-// status: "complete" when results are ready</div>
-                </div>
-            </div>
-
-            <div class="api-endpoint">
-                <span class="api-method post">POST</span>
-                <span class="api-path">/api/config/avr</span>
-                <p class="api-desc">Update AVR configuration. Saves to flash and reconfigures the live instance.</p>
-                <div class="api-section">
-                    <h4>Parameters</h4>
-                    <table class="param-table">
-                        <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-                        <tr>
-                            <td><span class="param-name">enabled</span></td>
-                            <td><span class="param-type">string</span></td>
-                            <td>"1" or "true" to enable, "0" or "false" to disable</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">ip</span></td>
-                            <td><span class="param-type">string</span></td>
-                            <td>AVR IP address (e.g., "192.168.1.100")</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">input</span></td>
-                            <td><span class="param-type">string</span></td>
-                            <td>Denon input source (e.g., "GAME", "SAT/CBL", "DVD")</td>
-                        </tr>
-                    </table>
-                </div>
-                <div class="api-section">
-                    <h4>Response</h4>
-                    <div class="api-example">{ "status": "ok" }</div>
+}</div>
                 </div>
             </div>
 
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/avr/send</span>
-                <p class="api-desc">Send a raw command to the Denon AVR via TCP telnet (port 23). CR terminator is added automatically.</p>
+                <p class="api-desc">Send a raw command to the Denon AVR via telnet (TCP port 23). A CR terminator is added automatically. If the command can't be sent, returns 500 with <code>"status": "error"</code>.</p>
                 <div class="api-section">
                     <h4>Parameters</h4>
                     <table class="param-table">
@@ -467,48 +615,6 @@
             </div>
         </div>
 
-        <!-- Debug APIs -->
-        <div class="card" id="debug">
-            <h2>Debug</h2>
-
-            <div class="api-endpoint">
-                <span class="api-method post">POST</span>
-                <span class="api-path">/api/debug/led</span>
-                <p class="api-desc">Control the WS2812 RGB LED on GPIO21. LED returns to WiFi state indication after 10 seconds.</p>
-                <div class="api-section">
-                    <h4>Parameters</h4>
-                    <p style="font-size: 0.85em; color: #888; margin-bottom: 8px;">Use one of these options:</p>
-                    <table class="param-table">
-                        <tr><th>Name</th><th>Type</th><th>Description</th></tr>
-                        <tr>
-                            <td><span class="param-name">color</span></td>
-                            <td><span class="param-type">string</span></td>
-                            <td>Named color: red, green, blue, yellow, cyan, magenta, white, off</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">r, g, b</span></td>
-                            <td><span class="param-type">int</span></td>
-                            <td>RGB values (0-255 each)</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">reset</span></td>
-                            <td><span class="param-type">any</span></td>
-                            <td>Return LED to WiFi state indication mode</td>
-                        </tr>
-                    </table>
-                </div>
-                <div class="api-section">
-                    <h4>Response</h4>
-                    <div class="api-example">{
-  "status": "ok",
-  "r": 255,
-  "g": 0,
-  "b": 0
-}</div>
-                </div>
-            </div>
-        </div>
-
         <!-- Switcher APIs -->
         <div class="card" id="switcher">
             <h2>Switcher</h2>
@@ -516,7 +622,7 @@
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/switcher/send</span>
-                <p class="api-desc">Send a message to the video switcher via UART (GPIO43 TX, 9600 baud). CR+LF is appended automatically.</p>
+                <p class="api-desc">Send a message to the video switcher over its serial port (9600 baud for the Extron SW VGA). CR+LF is appended automatically.</p>
                 <div class="api-section">
                     <h4>Parameters</h4>
                     <table class="param-table">
@@ -524,7 +630,7 @@
                         <tr>
                             <td><span class="param-name">message</span></td>
                             <td><span class="param-type">string</span></td>
-                            <td>Message to send<span class="param-required">required</span></td>
+                            <td>Message to send (e.g., "1!" selects input 1 on an Extron)<span class="param-required">required</span></td>
                         </tr>
                     </table>
                 </div>
@@ -554,7 +660,7 @@
                         <tr>
                             <td><span class="param-name">clear</span></td>
                             <td><span class="param-type">any</span></td>
-                            <td>If present, clear message buffer after reading</td>
+                            <td>If present, clear the message buffer before reading</td>
                         </tr>
                     </table>
                 </div>
@@ -571,6 +677,50 @@
             </div>
         </div>
 
+        <!-- Debug APIs -->
+        <div class="card" id="debug">
+            <h2>Debug</h2>
+
+            <div class="api-endpoint">
+                <span class="api-method post">POST</span>
+                <span class="api-path">/api/debug/led</span>
+                <p class="api-desc">Set the status LED color. The LED returns to WiFi status indication after 10 seconds.</p>
+                <div class="api-section">
+                    <h4>Parameters</h4>
+                    <p class="api-note">Use one of these options:</p>
+                    <table class="param-table">
+                        <tr><th>Name</th><th>Type</th><th>Description</th></tr>
+                        <tr>
+                            <td><span class="param-name">color</span></td>
+                            <td><span class="param-type">string</span></td>
+                            <td>Named color: red, green, blue, yellow, cyan, magenta, white, off</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">r, g, b</span></td>
+                            <td><span class="param-type">int</span></td>
+                            <td>RGB values (0-255 each, all three required)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">reset</span></td>
+                            <td><span class="param-type">any</span></td>
+                            <td>Return the LED to WiFi status indication now</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "status": "ok",
+  "r": 255,
+  "g": 0,
+  "b": 0
+}
+
+// reset returns only { "status": "ok" }</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Logs APIs -->
         <div class="card" id="logs">
             <h2>Logs</h2>
@@ -579,7 +729,7 @@
                 <span class="api-method get">GET</span>
                 <span class="api-path">/api/logs</span>
                 <button class="secondary try-btn" onclick="tryApi('GET', '/api/logs?count=10')">Try</button>
-                <p class="api-desc">Get system log entries. Use <code>since</code> parameter for incremental polling.</p>
+                <p class="api-desc">Get system log entries. The device keeps the last 100 entries. Use <code>since</code> for incremental polling.</p>
                 <div class="api-section">
                     <h4>Parameters</h4>
                     <table class="param-table">
@@ -592,12 +742,12 @@
                         <tr>
                             <td><span class="param-name">since</span></td>
                             <td><span class="param-type">int</span></td>
-                            <td>Return logs after this index (use <code>total</code> from previous response)</td>
+                            <td>Return only entries logged after this index (use <code>total</code> from the previous response)</td>
                         </tr>
                         <tr>
                             <td><span class="param-name">clear</span></td>
                             <td><span class="param-type">any</span></td>
-                            <td>If present, clear log buffer</td>
+                            <td>If present, clear the log buffer</td>
                         </tr>
                     </table>
                 </div>
@@ -612,8 +762,9 @@
   ]
 }
 
-// Log levels: 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
-// ts = milliseconds since boot</div>
+// total: number of entries logged since boot
+// lvl:   0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
+// ts:    milliseconds since boot</div>
                 </div>
             </div>
         </div>
@@ -642,7 +793,7 @@
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/ota/upload</span>
-                <p class="api-desc">Upload firmware or filesystem binary. Use <code>multipart/form-data</code> encoding. Device reboots on success.</p>
+                <p class="api-desc">Upload a firmware or filesystem image (<code>multipart/form-data</code>). The device reboots on success. A filesystem update replaces <code>config.json</code> and <code>wifi.json</code>; back up first (<code>scripts/ota_upload.py</code> backs up and restores automatically).</p>
                 <div class="api-section">
                     <h4>Parameters</h4>
                     <table class="param-table">
@@ -650,12 +801,12 @@
                         <tr>
                             <td><span class="param-name">file</span></td>
                             <td><span class="param-type">file</span></td>
-                            <td>Binary file (.bin)<span class="param-required">required</span></td>
+                            <td>Binary image (.bin)<span class="param-required">required</span></td>
                         </tr>
                         <tr>
                             <td><span class="param-name">mode</span></td>
                             <td><span class="param-type">string</span></td>
-                            <td>"firmware" or "fs" (default: firmware)</td>
+                            <td><code>"firmware"</code> (default) or <code>"fs"</code>. Without <code>mode</code>, a filename containing "littlefs" is treated as a filesystem image.</td>
                         </tr>
                     </table>
                 </div>
@@ -669,10 +820,29 @@
             </div>
         </div>
 
+        <!-- System APIs -->
+        <div class="card" id="system">
+            <h2>System</h2>
+
+            <div class="api-endpoint">
+                <span class="api-method post">POST</span>
+                <span class="api-path">/api/system/reboot</span>
+                <button class="secondary try-btn" onclick="tryApi('POST', '/api/system/reboot')">Try</button>
+                <p class="api-desc">Reboot the device. Responds, then restarts about half a second later.</p>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "status": "ok",
+  "message": "Rebooting..."
+}</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Command Line Examples -->
         <div class="card" id="examples">
             <h2>Command Line Examples</h2>
-            <p style="color: #888; font-size: 0.9em; margin-bottom: 15px;">Using curl from terminal:</p>
+            <p style="color: #888; font-size: 0.9em; margin-bottom: 15px;">Using curl from a terminal:</p>
 
             <div class="api-section">
                 <h4>Get Status</h4>
@@ -691,21 +861,30 @@
             </div>
 
             <div class="api-section">
+                <h4>Get Triggers</h4>
+                <div class="api-example">curl http://tinklink.local/api/config/triggers</div>
+            </div>
+
+            <div class="api-section">
                 <h4>Update Triggers</h4>
                 <div class="api-example">curl -X POST http://tinklink.local/api/config/triggers \
-     -d 'triggers=[{"input":1,"profile":1,"mode":"SVS","name":"NES"},{"input":2,"profile":2,"mode":"SVS","name":"SNES"}]'</div>
+     --data-urlencode 'triggers=[{"input":1,"profile":1,"mode":"SVS","name":"NES"},{"input":2,"profile":2,"mode":"SVS","name":"SNES"}]'</div>
+            </div>
+
+            <div class="api-section">
+                <h4>Set RetroTINK Baud Rate</h4>
+                <div class="api-example">curl -X POST http://tinklink.local/api/config/tink -d "baudRate=115200"</div>
             </div>
 
             <div class="api-section">
                 <h4>Send RetroTINK Command</h4>
                 <div class="api-example">curl -X POST http://tinklink.local/api/tink/send \
-     -d "command=SVS NEW INPUT=1"</div>
+     --data-urlencode "command=SVS NEW INPUT=1"</div>
             </div>
 
             <div class="api-section">
                 <h4>Send Switcher Command</h4>
-                <div class="api-example">curl -X POST http://tinklink.local/api/switcher/send \
-     -d "message=1!"</div>
+                <div class="api-example">curl -X POST http://tinklink.local/api/switcher/send -d "message=1!"</div>
             </div>
 
             <div class="api-section">
@@ -716,19 +895,17 @@
             <div class="api-section">
                 <h4>Configure AVR</h4>
                 <div class="api-example">curl -X POST http://tinklink.local/api/config/avr \
-     -d "enabled=1&ip=192.168.1.100&input=GAME"</div>
+     -d "enabled=1&ip=192.168.1.50&input=GAME"</div>
             </div>
 
             <div class="api-section">
                 <h4>Send AVR Command</h4>
-                <div class="api-example">curl -X POST http://tinklink.local/api/avr/send \
-     -d "command=PW?"</div>
+                <div class="api-example">curl -X POST http://tinklink.local/api/avr/send -d "command=PW?"</div>
             </div>
 
             <div class="api-section">
                 <h4>Set LED Color</h4>
-                <div class="api-example">curl -X POST http://tinklink.local/api/debug/led \
-     -d "color=blue"</div>
+                <div class="api-example">curl -X POST http://tinklink.local/api/debug/led -d "color=blue"</div>
             </div>
 
             <div class="api-section">
@@ -739,7 +916,23 @@
             <div class="api-section">
                 <h4>Upload Firmware via OTA</h4>
                 <div class="api-example">curl -X POST http://tinklink.local/api/ota/upload \
-     -F "file=@firmware.bin" -F "mode=firmware"</div>
+     -F "mode=firmware" -F "file=@firmware.bin"</div>
+            </div>
+
+            <div class="api-section">
+                <h4>Backup Config</h4>
+                <div class="api-example">curl http://tinklink.local/api/config/backup -o config_backup.json</div>
+            </div>
+
+            <div class="api-section">
+                <h4>Restore Config</h4>
+                <div class="api-example">curl -X POST http://tinklink.local/api/config/restore \
+     -H "Content-Type: application/json" -d @config_backup.json</div>
+            </div>
+
+            <div class="api-section">
+                <h4>Reboot Device</h4>
+                <div class="api-example">curl -X POST http://tinklink.local/api/system/reboot</div>
             </div>
         </div>
 

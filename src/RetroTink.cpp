@@ -13,6 +13,8 @@ static const uint32_t DEFAULT_UART_BAUD = 115200;
 
 RetroTink::RetroTink()
     : _serial(nullptr)
+    , _defaultBaudRate(DEFAULT_USB_BAUD)
+    , _baudFlushAt(0)
     , _lastCommand("")
     , _powerMgmtMode(PowerManagementMode::FULL)
     , _powerState(RT4KPowerState::UNKNOWN)
@@ -55,6 +57,8 @@ void RetroTink::configure(const JsonObject& config) {
         delete _serial;
         _serial = nullptr;
     }
+
+    _defaultBaudRate = (serialMode == "uart") ? DEFAULT_UART_BAUD : DEFAULT_USB_BAUD;
 
     // Create appropriate serial interface based on mode
     if (serialMode == "uart") {
@@ -254,6 +258,21 @@ bool RetroTink::isConnected() const {
     return _serial->isConnected();
 }
 
+bool RetroTink::setBaudRate(uint32_t baud) {
+    if (!_serial || !_serial->setBaudRate(baud)) {
+        LOG_WARN("RetroTink: Baud rate %lu not supported", (unsigned long)baud);
+        return false;
+    }
+
+    LOG_INFO("RetroTink: Baud rate set to %lu", (unsigned long)baud);
+    _baudFlushAt = millis() + BAUD_FLUSH_DELAY_MS;
+    return true;
+}
+
+uint32_t RetroTink::getBaudRate() const {
+    return _serial ? _serial->getBaudRate() : 0;
+}
+
 const char* RetroTink::getPowerStateString() const {
     switch (_powerState) {
         case RT4KPowerState::UNKNOWN:  return "unknown";
@@ -384,6 +403,15 @@ void RetroTink::processIncomingData() {
 
 void RetroTink::processPendingOperations() {
     unsigned long now = millis();
+
+    // Flush the RT4K's input after a baud rate change (see _baudFlushAt)
+    if (_baudFlushAt && (long)(now - _baudFlushAt) >= 0) {
+        _baudFlushAt = 0;
+        if (_serial && _serial->isConnected()) {
+            _serial->sendData("\r");
+            LOG_DEBUG("RetroTink: Flushed RT4K input after baud rate change");
+        }
+    }
 
     // Check for wake response timeout (UNKNOWN -> pwr on sent, waiting for RT4K response)
     if (_powerState == RT4KPowerState::WAKING && _bootWaitStart > 0) {

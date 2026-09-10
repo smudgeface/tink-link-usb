@@ -126,6 +126,12 @@ public:
     void setAvrConfig(const JsonObject& config);
 
     /**
+     * Set RetroTINK configuration (not saved until saveConfig() called).
+     * @param config RetroTINK configuration as JSON object
+     */
+    void setRetroTinkConfig(const JsonObject& config);
+
+    /**
      * Check if WiFi credentials have been configured.
      * @return true if SSID is non-empty
      */

@@ -35,19 +35,30 @@ enum class OTAMode {
  * - UART testing endpoints
  * - System log retrieval
  *
- * API Endpoints:
- * - GET  /api/status             - System status (WiFi, switcher, triggers)
+ * API Endpoints (documented in data/api.html):
+ * - GET  /api/status             - System status (WiFi, switcher, RetroTINK, AVR, triggers)
  * - GET  /api/wifi/scan          - Scan for WiFi networks
  * - POST /api/wifi/connect       - Connect to WiFi network
  * - POST /api/wifi/disconnect    - Disconnect from WiFi
  * - POST /api/wifi/save          - Save WiFi credentials
+ * - GET  /api/config/triggers    - Get trigger mappings
+ * - POST /api/config/triggers    - Replace trigger mappings
+ * - GET  /api/config/tink        - Get RetroTINK serial settings
+ * - POST /api/config/tink        - Update RetroTINK serial settings (applied live)
+ * - GET  /api/config/avr         - Get AVR configuration
+ * - POST /api/config/avr         - Update AVR configuration (applied live)
+ * - GET  /api/config/backup      - Download config.json + wifi.json
+ * - POST /api/config/restore     - Restore config from backup JSON
  * - POST /api/tink/send          - Send command to RetroTINK
- * - POST /api/debug/led          - Control status LED
+ * - GET  /api/avr/discover       - Discover AVRs via SSDP
+ * - POST /api/avr/send           - Send command to AVR
  * - POST /api/switcher/send      - Send message to video switcher
  * - GET  /api/switcher/receive   - Get recent switcher messages
+ * - POST /api/debug/led          - Control status LED
  * - GET  /api/logs               - Get system logs
  * - GET  /api/ota/status         - Get OTA update progress
  * - POST /api/ota/upload         - Upload firmware or filesystem
+ * - POST /api/system/reboot      - Reboot the device
  */
 class WebServer {
 public:
@@ -109,6 +120,9 @@ private:
     void handleApiDisconnect(AsyncWebServerRequest* request);
     void handleApiSave(AsyncWebServerRequest* request);
     void handleApiConfigTriggers(AsyncWebServerRequest* request);
+    void handleApiConfigTriggersGet(AsyncWebServerRequest* request);
+    void handleApiConfigTink(AsyncWebServerRequest* request);
+    void handleApiConfigTinkGet(AsyncWebServerRequest* request);
     void handleApiTinkSend(AsyncWebServerRequest* request);
     void handleApiDebugLED(AsyncWebServerRequest* request);
     void handleApiSwitcherSend(AsyncWebServerRequest* request);

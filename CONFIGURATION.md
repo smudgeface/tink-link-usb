@@ -98,7 +98,7 @@ Configures the RetroTINK 4K connection and power management.
 - UART mode (HD-15) runs at **115200 baud, 8N1** by default
 - `baudRate` is omitted from the default config so each mode uses its own default. Supported USB rates: 300–921600 standard rates, 1000000, 1500000, 2000000, 3000000 (anything else falls back to 2000000)
 - Persistent "RX line errors ... framing" warnings in the log mean the baud rate doesn't match the RetroTINK's
-- Baud rate is applied at boot (reboot after changing it)
+- Change the baud rate on the Config page (RetroTINK section) or with `POST /api/config/tink`; it applies immediately. Choosing the serial mode's default removes `baudRate` from the config
 - USB mode uses the FTDI FT232R driver via USB OTG (S3 only)
 - Full power management provides the most reliable operation with automatic wake/sleep handling
 
@@ -362,4 +362,4 @@ This versioning ensures that restoring old or incompatible configuration files d
 
 ---
 
-**Last Updated:** 2026-09-10 (v1.11.0)
+**Last Updated:** 2026-09-10 (v1.12.0)
