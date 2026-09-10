@@ -13,7 +13,7 @@
         <nav>
             <a href="/">Status</a>
             <a href="/config.html" class="active">Config</a>
-            <a href="/debug.html">Debug</a>
+            <a href="/debug.html">System</a>
             <a href="/api.html">API</a>
         </nav>
 
@@ -138,6 +138,32 @@
                     <button type="button" class="secondary" onclick="testAvrConnection()">Test Connection</button>
                 </div>
                 <div id="avr-message"></div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>RetroTINK</h2>
+            <p style="margin-bottom: 15px; font-size: 0.9em; color: #888;">
+                Serial connection to the RetroTINK 4K. Changes apply immediately.
+            </p>
+
+            <form id="tink-form" onsubmit="return saveTinkConfig(event)">
+                <div class="status-item" style="margin-bottom: 15px;">
+                    <span class="status-label">Connection</span>
+                    <span class="status-value" id="tink-serial-mode">--</span>
+                </div>
+                <div class="input-group">
+                    <label for="tink-baud">Baud Rate</label>
+                    <select id="tink-baud"></select>
+                </div>
+                <div class="message info">
+                    RetroTINK 4K firmware 1.75 and later uses <strong>2,000,000</strong> baud over USB.
+                    Earlier firmware and the HD-15 serial port use <strong>115,200</strong>.
+                </div>
+                <div class="btn-row">
+                    <button type="submit">Save RetroTINK Config</button>
+                </div>
+                <div id="tink-message"></div>
             </form>
         </div>
 
@@ -386,7 +412,7 @@
         let triggers = [];
 
         function loadTriggers() {
-            fetch('/api/status')
+            fetch('/api/config/triggers')
                 .then(response => response.json())
                 .then(data => {
                     triggers = data.triggers || [];
@@ -667,6 +693,63 @@
             }
         }
 
+        // RetroTINK Configuration
+        const TINK_BAUD_RATES = [2000000, 115200];
+        let tinkMessageTimeout = null;
+
+        function loadTinkConfig() {
+            fetch('/api/config/tink')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('tink-serial-mode').textContent =
+                        data.serialMode === 'uart' ? 'UART (HD-15)' : 'USB';
+
+                    // Keep a custom rate set in config.json selectable so saving doesn't silently change it
+                    const rates = TINK_BAUD_RATES.includes(data.baudRate)
+                        ? TINK_BAUD_RATES : TINK_BAUD_RATES.concat([data.baudRate]);
+                    const select = document.getElementById('tink-baud');
+                    select.innerHTML = rates.map(rate => {
+                        const label = rate.toLocaleString('en-US') + (rate === data.defaultBaudRate ? ' (default)' : '');
+                        return `<option value="${rate}">${label}</option>`;
+                    }).join('');
+                    select.value = data.baudRate;
+                })
+                .catch(err => console.error('Failed to load RetroTINK config:', err));
+        }
+
+        function saveTinkConfig(event) {
+            event.preventDefault();
+
+            const formData = new FormData();
+            formData.append('baudRate', document.getElementById('tink-baud').value);
+
+            fetch('/api/config/tink', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showTinkMessage('Failed to save RetroTINK config: ' + data.error, 'error');
+                } else {
+                    showTinkMessage('RetroTINK configuration saved', 'success');
+                }
+            })
+            .catch(err => {
+                showTinkMessage('Failed to save RetroTINK config', 'error');
+                console.error('Save failed:', err);
+            });
+
+            return false;
+        }
+
+        function showTinkMessage(text, type) {
+            const msg = document.getElementById('tink-message');
+            msg.innerHTML = `<div class="message ${type}" style="margin-top: 15px;">${text}</div>`;
+            if (tinkMessageTimeout) clearTimeout(tinkMessageTimeout);
+            tinkMessageTimeout = setTimeout(() => msg.innerHTML = '', 5000);
+        }
+
         // Update status on load and periodically
         updateStatus();
         setInterval(updateStatus, 3000);
@@ -674,8 +757,9 @@
         // Load triggers on page load
         loadTriggers();
 
-        // Load AVR config on page load
+        // Load AVR and RetroTINK config on page load
         loadAvrConfig();
+        loadTinkConfig();
     </script>
 </body>
 </html>

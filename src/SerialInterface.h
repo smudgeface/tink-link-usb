@@ -38,6 +38,16 @@ public:
 
     /** Number of bytes available to read. */
     virtual size_t available() const = 0;
+
+    /**
+     * Change the baud rate of the running transport.
+     * @param baud New baud rate
+     * @return false if the transport has no baud rate (e.g. TCP) or doesn't support the rate
+     */
+    virtual bool setBaudRate(uint32_t /*baud*/) { return false; }
+
+    /** @return Current baud rate, or 0 if the transport has no baud rate */
+    virtual uint32_t getBaudRate() const { return 0; }
 };
 
 #endif // SERIAL_INTERFACE_H

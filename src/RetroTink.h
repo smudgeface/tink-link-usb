@@ -186,8 +186,33 @@ public:
      */
     String getLastCommand() const { return _lastCommand; }
 
+    /**
+     * Change the serial baud rate at runtime (not persisted).
+     * USB rates must satisfy UsbHostSerial::isSupportedBaud(); UART accepts
+     * UartSerial::MIN_BAUD to UartSerial::MAX_BAUD.
+     * @param baud New baud rate
+     * @return true if the transport accepted the rate
+     */
+    bool setBaudRate(uint32_t baud);
+
+    /** @return Current serial baud rate, or 0 if no transport is configured */
+    uint32_t getBaudRate() const;
+
+    /**
+     * @return Default baud rate for the configured serial mode
+     *         (2,000,000 for USB, 115,200 for UART)
+     */
+    uint32_t getDefaultBaudRate() const { return _defaultBaudRate; }
+
 private:
     SerialInterface* _serial;
+    uint32_t _defaultBaudRate;
+
+    // After a baud rate change, a lone CR is sent once the new rate is in
+    // effect so bytes the RT4K received at a mismatched rate are discarded
+    // instead of corrupting the next command
+    volatile unsigned long _baudFlushAt;
+    static const unsigned long BAUD_FLUSH_DELAY_MS = 100;
     std::vector<TriggerMapping> _triggers;
     String _lastCommand;
 

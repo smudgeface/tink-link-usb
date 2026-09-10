@@ -113,7 +113,7 @@ Access the web interface at `http://tinklink.local`. Once connected to WiFi, sub
 
 ```bash
 pio run -t ota -e esp32c3
-pio run -t otafs -e esp32c3
+pio run -t buildfs -t otafs -e esp32c3
 ```
 
 ### References

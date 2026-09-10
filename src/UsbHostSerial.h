@@ -28,6 +28,7 @@ static const size_t USB_RX_TRANSFER_SIZE = 512;
  *
  * Subclasses EspUsbHostSerial_FTDI to provide:
  * - Automatic FTDI device detection and initialization at a configurable baud rate
+ * - Runtime baud rate changes
  * - Connection/disconnection tracking with callbacks
  * - Multi-packet bulk IN transfers, polled on every update()
  * - Ring buffer for incoming data
@@ -62,15 +63,23 @@ public:
 
     /**
      * Check whether a baud rate can be configured on the FTDI device.
-     * EspUsbHostSerial_FTDI only knows the divisors for standard rates and
-     * silently falls back to 9600 baud for anything else.
+     * Only standard rates with a known FT232R divisor are supported.
      * @param baud Baud rate to check
      * @return true if the rate is supported
      */
     static bool isSupportedBaud(uint32_t baud);
 
+    /**
+     * Change the baud rate. A connected device is reconfigured on the next
+     * update() (USB transfers must be submitted from the loop task); devices
+     * connected later use the new rate.
+     * @param baud New baud rate (must satisfy isSupportedBaud())
+     * @return false if the rate is not supported
+     */
+    bool setBaudRate(uint32_t baud) override;
+
     /** @return Configured FTDI baud rate */
-    uint32_t getBaudRate() const { return _baud; }
+    uint32_t getBaudRate() const override { return _baud; }
 
     /**
      * Initialize USB Host via EspUsbHost::begin() for FTDI communication at the configured baud rate.
@@ -81,8 +90,8 @@ public:
 
     /**
      * Process USB Host events. Must be called in loop().
-     * Delegates to EspUsbHostSerial_FTDI::task() and periodically logs
-     * FTDI line errors.
+     * Delegates to EspUsbHostSerial_FTDI::task(), applies pending baud rate
+     * changes, and periodically logs FTDI line errors.
      */
     void update() override;
 
@@ -188,6 +197,7 @@ protected:
 private:
     uint32_t _baud;
     volatile bool _connected;
+    volatile bool _baudChangePending;
 
     // Ring buffer for received data
     uint8_t _rxBuffer[USB_RX_BUFFER_SIZE];
@@ -203,11 +213,23 @@ private:
     static const size_t FTDI_STATUS_BYTES = 2;
     static const uint8_t FTDI_LSR_OVERRUN = 0x02;
     static const uint8_t FTDI_LSR_FRAMING = 0x08;
+    static const uint8_t FTDI_SIO_SET_BAUD_RATE = 0x03;
     static const unsigned long ERROR_REPORT_INTERVAL_MS = 30000;
 
     // Callbacks
     ConnectCallback _onConnected;
     ConnectCallback _onDisconnected;
+
+    /**
+     * Look up the FT232R baud rate divisor (same values as EspUsbHostSerial_FTDI).
+     * @param baud Baud rate
+     * @param divisor Output divisor for the SIO_SET_BAUD_RATE request
+     * @return false if the rate has no divisor
+     */
+    static bool ftdiBaudDivisor(uint32_t baud, uint16_t& divisor);
+
+    /** Send the current baud rate to the connected FTDI device. */
+    void applyBaudRate();
 
     /**
      * Write a byte to the ring buffer.

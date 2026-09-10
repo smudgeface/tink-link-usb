@@ -7,6 +7,7 @@
 UsbHostSerial::UsbHostSerial(uint32_t baud)
     : _baud(baud)
     , _connected(false)
+    , _baudChangePending(false)
     , _rxHead(0)
     , _rxTail(0)
     , _rxPacketSize(64)
@@ -26,17 +27,57 @@ UsbHostSerial::UsbHostSerial(uint32_t baud)
 UsbHostSerial::~UsbHostSerial() {
 }
 
-bool UsbHostSerial::isSupportedBaud(uint32_t baud) {
-    // Rates with a divisor in EspUsbHostSerial_FTDI::onConfig()
+bool UsbHostSerial::ftdiBaudDivisor(uint32_t baud, uint16_t& divisor) {
+    // Divisors from EspUsbHostSerial_FTDI::onConfig() (FT232R encoding)
     switch (baud) {
-        case 300:     case 600:     case 1200:    case 2400:
-        case 4800:    case 9600:    case 19200:   case 38400:
-        case 57600:   case 115200:  case 230400:  case 460800:
-        case 921600:  case 1000000: case 1500000: case 2000000:
-        case 3000000:
-            return true;
-        default:
-            return false;
+        case 300:     divisor = 0x2710; return true;
+        case 600:     divisor = 0x1388; return true;
+        case 1200:    divisor = 0x09c4; return true;
+        case 2400:    divisor = 0x04e2; return true;
+        case 4800:    divisor = 0x0271; return true;
+        case 9600:    divisor = 0x4138; return true;
+        case 19200:   divisor = 0x809c; return true;
+        case 38400:   divisor = 0xc04e; return true;
+        case 57600:   divisor = 0xc034; return true;
+        case 115200:  divisor = 0x001a; return true;
+        case 230400:  divisor = 0x000d; return true;
+        case 460800:  divisor = 0x4006; return true;
+        case 921600:  divisor = 0x8003; return true;
+        case 1000000: divisor = 0x0003; return true;
+        case 1500000: divisor = 0x0002; return true;
+        case 2000000: divisor = 0x0001; return true;
+        case 3000000: divisor = 0x0000; return true;
+        default:      return false;
+    }
+}
+
+bool UsbHostSerial::isSupportedBaud(uint32_t baud) {
+    uint16_t divisor;
+    return ftdiBaudDivisor(baud, divisor);
+}
+
+bool UsbHostSerial::setBaudRate(uint32_t baud) {
+    if (!isSupportedBaud(baud)) {
+        return false;
+    }
+
+    _baud = baud;
+    baudSpeed = baud;           // Used by EspUsbHostSerial_FTDI when a device connects
+    _baudChangePending = true;  // Applied to a connected device in update()
+    return true;
+}
+
+void UsbHostSerial::applyBaudRate() {
+    uint16_t divisor;
+    if (!ftdiBaudDivisor(_baud, divisor)) {
+        return;
+    }
+
+    esp_err_t err = submit_control(0x40, FTDI_SIO_SET_BAUD_RATE, divisor);
+    if (err == ESP_OK) {
+        LOG_INFO("UsbHostSerial: Baud rate changed to %lu", (unsigned long)_baud);
+    } else {
+        LOG_ERROR("UsbHostSerial: Failed to change baud rate (err 0x%x)", err);
     }
 }
 
@@ -51,6 +92,14 @@ bool UsbHostSerial::initTransport() {
 
 void UsbHostSerial::update() {
     task();
+
+    if (_baudChangePending) {
+        _baudChangePending = false;
+        if (_connected) {
+            applyBaudRate();
+        }
+    }
+
     reportLineErrors();
 }
 

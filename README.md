@@ -1,6 +1,6 @@
 # TinkLink-USB
 
-> **Current Version**: 1.11.0
+> **Current Version**: 1.12.0
 
 An ESP32-based bridge between video switchers and the RetroTINK 4K.
 
@@ -322,7 +322,7 @@ Once your device is connected to WiFi, you can update firmware and filesystem wi
 pio run -t ota -e esp32s3
 
 # Build and upload filesystem via OTA
-pio run -t otafs -e esp32s3
+pio run -t buildfs -t otafs -e esp32s3
 
 # Use a specific IP address instead of mDNS
 TINKLINK_HOST=192.168.1.100 pio run -t ota -e esp32s3
@@ -495,6 +495,14 @@ tink-link-usb/
 ```
 
 ## Changelog
+
+### v1.12.0 — RetroTINK Config Page & API Reference Cleanup
+
+- **RetroTINK settings on the Config page** — New RetroTINK section shows the serial connection and a baud rate selector (2,000,000 / 115,200). Changes apply immediately, no reboot needed.
+- **Live baud rate changes** — The USB (FTDI) and UART transports can change baud rate at runtime.
+- **New API endpoints** — `GET`/`POST /api/config/tink` for RetroTINK serial settings; `GET /api/config/triggers` for trigger mappings (the Config page now uses it instead of `/api/status`).
+- **API reference overhaul** — All `/api/config/*` endpoints are grouped under Configuration; fixed the System section's broken styling; corrected response examples, error behavior and parameter details; removed the "Try" button from `/api/wifi/disconnect`, which would cut off access to the device.
+- **ESP32-C3 web pages synced** — `data_c3/` still had the v1.9.0 web pages; they now match `data/`.
 
 ### v1.11.0 — RetroTINK 2 Mbaud USB Serial & AP Mode Recovery Fix
 

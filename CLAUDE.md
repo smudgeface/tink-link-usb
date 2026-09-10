@@ -6,7 +6,7 @@ This document provides guidelines and conventions for Claude (AI assistant) when
 
 TinkLink-USB is an ESP32-S3 USB bridge between video switchers and the RetroTINK 4K. It automatically triggers RetroTINK profile changes when video switcher inputs change.
 
-**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, SSDP discovery, config backup/restore, and reboot API all functional. Version 1.11.0.
+**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, SSDP discovery, config backup/restore, and reboot API all functional. Version 1.12.0.
 
 **Tech Stack:**
 - Platform: ESP32-S3 (Arduino framework, USB OTG mode)
@@ -185,7 +185,7 @@ APIs are organized by resource:
 /api/tink/*              - RetroTINK operations
 /api/switcher/*          - Video switcher operations
 /api/avr/*               - Denon/Marantz AVR operations
-/api/config/*            - Configuration (triggers, AVR, backup/restore)
+/api/config/*            - Configuration (triggers, tink, AVR, backup/restore)
 /api/debug/*             - Debug utilities
 /api/logs                - System logs
 /api/ota/*               - OTA updates
@@ -264,7 +264,7 @@ pio run -t uploadfs -e esp32s3
 
 # Upload via OTA (preferred - device runs in USB OTG mode)
 pio run -t ota -e esp32s3
-pio run -t otafs -e esp32s3
+pio run -t buildfs -t otafs -e esp32s3   # buildfs is required: otafs uploads the existing image
 ```
 
 ### Remote Debugging
@@ -295,7 +295,7 @@ Before committing significant changes:
 1. Add route in `WebServer::setupRoutes()`
 2. Implement handler method
 3. Update header documentation
-4. Update `data/api.html` with endpoint docs
+4. Update `data/api.html` with endpoint docs, then copy changed HTML to `data_c3/` (the web pages are identical; only `config.json` differs)
 5. Test with curl
 
 ### Adding Configuration Options
@@ -447,6 +447,7 @@ All user-facing configuration changes must apply immediately without requiring a
 - **Triggers** — Clears and reloads into RetroTink on save
 - **AVR enable/disable** — Creates or destroys instance at runtime via `DenonAvr**` pointer-to-pointer
 - **AVR settings** (IP, input) — Reconfigures live instance
+- **RetroTINK baud rate** — Applied to the running serial transport (USB change is deferred to the loop task)
 
 Hardware-level settings (switcher type, RetroTink serial mode, pin assignments) are boot-only since they represent physical hardware that doesn't change at runtime.
 
@@ -472,4 +473,4 @@ The version constant is in the `handleApiConfigBackup()` method in `WebServer.cp
 
 ---
 
-**Last Updated**: 2026-09-10 (v1.11.0)
+**Last Updated**: 2026-09-10 (v1.12.0)

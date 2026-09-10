@@ -10,6 +10,17 @@
 #include <LittleFS.h>
 #include <Update.h>
 
+// Serialize trigger mappings (shared by /api/status and /api/config/triggers)
+static void addTriggers(JsonArray triggersArray, const std::vector<TriggerMapping>& triggers) {
+    for (const auto& trigger : triggers) {
+        JsonObject triggerObj = triggersArray.add<JsonObject>();
+        triggerObj["input"] = trigger.switcherInput;
+        triggerObj["profile"] = trigger.profile;
+        triggerObj["mode"] = trigger.mode == TriggerMapping::SVS ? "SVS" : "Remote";
+        triggerObj["name"] = trigger.name;
+    }
+}
+
 WebServer::WebServer(uint16_t port)
     : _server(new AsyncWebServer(port))
     , _wifi(nullptr)
@@ -69,8 +80,17 @@ void WebServer::setupRoutes() {
         [this](AsyncWebServerRequest* request) { handleApiSave(request); });
 
     // Configuration endpoints
+    _server->on("/api/config/triggers", HTTP_GET,
+        [this](AsyncWebServerRequest* request) { handleApiConfigTriggersGet(request); });
+
     _server->on("/api/config/triggers", HTTP_POST,
         [this](AsyncWebServerRequest* request) { handleApiConfigTriggers(request); });
+
+    _server->on("/api/config/tink", HTTP_GET,
+        [this](AsyncWebServerRequest* request) { handleApiConfigTinkGet(request); });
+
+    _server->on("/api/config/tink", HTTP_POST,
+        [this](AsyncWebServerRequest* request) { handleApiConfigTink(request); });
 
     // RetroTINK endpoints
     _server->on("/api/tink/send", HTTP_POST,
@@ -216,14 +236,7 @@ void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
     }
 
     // Triggers
-    JsonArray triggersArray = doc["triggers"].to<JsonArray>();
-    for (const auto& trigger : _config->getTriggers()) {
-        JsonObject triggerObj = triggersArray.add<JsonObject>();
-        triggerObj["input"] = trigger.switcherInput;
-        triggerObj["profile"] = trigger.profile;
-        triggerObj["mode"] = trigger.mode == TriggerMapping::SVS ? "SVS" : "Remote";
-        triggerObj["name"] = trigger.name;
-    }
+    addTriggers(doc["triggers"].to<JsonArray>(), _config->getTriggers());
 
     String response;
     serializeJson(doc, response);
@@ -372,6 +385,74 @@ void WebServer::handleApiConfigTriggers(AsyncWebServerRequest* request) {
     } else {
         request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
         LOG_ERROR("WebServer: Failed to save triggers");
+    }
+}
+
+void WebServer::handleApiConfigTriggersGet(AsyncWebServerRequest* request) {
+    JsonDocument doc;
+    addTriggers(doc["triggers"].to<JsonArray>(), _config->getTriggers());
+
+    String response;
+    serializeJson(doc, response);
+    request->send(200, "application/json", response);
+}
+
+void WebServer::handleApiConfigTinkGet(AsyncWebServerRequest* request) {
+    auto tinkConfig = _config->getRetroTinkConfig();
+
+    JsonDocument doc;
+    doc["serialMode"] = tinkConfig["serialMode"] | "usb";
+    doc["powerManagementMode"] = tinkConfig["powerManagementMode"] | "full";
+
+    // Report the live transport rate; fall back to config if no transport exists
+    uint32_t baud = _tink->getBaudRate();
+    doc["baudRate"] = baud ? baud : (tinkConfig["baudRate"] | _tink->getDefaultBaudRate());
+    doc["defaultBaudRate"] = _tink->getDefaultBaudRate();
+
+    String response;
+    serializeJson(doc, response);
+    request->send(200, "application/json", response);
+}
+
+void WebServer::handleApiConfigTink(AsyncWebServerRequest* request) {
+    if (!request->hasParam("baudRate", true)) {
+        request->send(400, "application/json", "{\"error\":\"Missing baudRate parameter\"}");
+        return;
+    }
+
+    long baud = request->getParam("baudRate", true)->value().toInt();
+    if (baud <= 0) {
+        request->send(400, "application/json", "{\"error\":\"Invalid baud rate\"}");
+        return;
+    }
+
+    // Apply live first - the transport validates the rate for its serial mode
+    if (!_tink->setBaudRate((uint32_t)baud)) {
+        request->send(400, "application/json", "{\"error\":\"Baud rate not supported in this serial mode\"}");
+        return;
+    }
+
+    // Persist only non-default rates so each serial mode keeps its own default
+    JsonDocument newConfigDoc;
+    newConfigDoc.set(_config->getRetroTinkConfig());
+    if ((uint32_t)baud == _tink->getDefaultBaudRate()) {
+        newConfigDoc.remove("baudRate");
+    } else {
+        newConfigDoc["baudRate"] = (uint32_t)baud;
+    }
+    _config->setRetroTinkConfig(newConfigDoc.as<JsonObject>());
+
+    if (_config->saveConfig()) {
+        JsonDocument doc;
+        doc["status"] = "ok";
+        doc["baudRate"] = baud;
+
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+        LOG_INFO("WebServer: RetroTINK config saved (baudRate: %ld)", baud);
+    } else {
+        request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
     }
 }
 

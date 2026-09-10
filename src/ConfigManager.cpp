@@ -237,6 +237,11 @@ void ConfigManager::setAvrConfig(const JsonObject& config) {
     _avrConfigDoc.set(config);
 }
 
+void ConfigManager::setRetroTinkConfig(const JsonObject& config) {
+    _retrotinkConfigDoc.clear();
+    _retrotinkConfigDoc.set(config);
+}
+
 JsonObject ConfigManager::getSwitcherConfig() {
     return _switcherConfigDoc.as<JsonObject>();
 }
