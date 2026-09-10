@@ -49,17 +49,21 @@ bool UartSerial::readLine(String& line) {
     while (_hwSerial.available()) {
         char c = _hwSerial.read();
 
-        if (c == '\n') {
-            // Newline marks end of line
+        if (c == '\n' || c == '\r') {
+            // CR or LF marks end of line (empty lines from CR+LF pairs are skipped)
             if (_lineBuffer.length() > 0) {
                 line = _lineBuffer;
                 _lineBuffer = "";
                 return true;
             }
-        } else if (c == '\r') {
-            // Ignore CR (will handle LF as terminator)
         } else {
             _lineBuffer += c;
+            if (_lineBuffer.length() >= MAX_LINE_LENGTH) {
+                // Overlong or unterminated data - hand it over as-is
+                line = _lineBuffer;
+                _lineBuffer = "";
+                return true;
+            }
         }
     }
 

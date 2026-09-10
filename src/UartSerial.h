@@ -53,6 +53,9 @@ private:
     uint32_t _baud;
     bool _initialized;
     String _lineBuffer;
+
+    // Lines longer than this are returned as-is so unterminated data can't grow the buffer without bound
+    static const size_t MAX_LINE_LENGTH = 512;
 };
 
 #endif // UART_SERIAL_H

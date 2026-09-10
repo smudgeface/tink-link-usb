@@ -79,6 +79,7 @@ Configures the RetroTINK 4K connection and power management.
 | `uartId` | integer | UART peripheral number (0, 1, or 2) — only used when `serialMode` is `"uart"` |
 | `txPin` | integer | GPIO pin for transmit (TX) — only used when `serialMode` is `"uart"` |
 | `rxPin` | integer | GPIO pin for receive (RX) — only used when `serialMode` is `"uart"` |
+| `baudRate` | integer | *Optional.* Serial baud rate. Defaults to `2000000` for `"usb"` and `115200` for `"uart"` |
 
 **Serial Modes:**
 - `"usb"` — Use USB Host (ESP32-S3 only, requires EspUsbHost library and FTDI FT232R)
@@ -93,7 +94,11 @@ Configures the RetroTINK 4K connection and power management.
 | `"full"` | Auto-detects power state, sends wake command if needed, waits for ready state before commands |
 
 **Notes:**
-- Baud rate is fixed at **115200 baud, 8N1** for UART mode
+- USB mode runs at **2,000,000 baud, 8N1** by default — the USB serial default since RetroTINK 4K firmware 1.75. For older RetroTINK firmware, set `"baudRate": 115200`
+- UART mode (HD-15) runs at **115200 baud, 8N1** by default
+- `baudRate` is omitted from the default config so each mode uses its own default. Supported USB rates: 300–921600 standard rates, 1000000, 1500000, 2000000, 3000000 (anything else falls back to 2000000)
+- Persistent "RX line errors ... framing" warnings in the log mean the baud rate doesn't match the RetroTINK's
+- Baud rate is applied at boot (reboot after changing it)
 - USB mode uses the FTDI FT232R driver via USB OTG (S3 only)
 - Full power management provides the most reliable operation with automatic wake/sleep handling
 
@@ -357,4 +362,4 @@ This versioning ensures that restoring old or incompatible configuration files d
 
 ---
 
-**Last Updated:** 2026-02-16 (v1.10.0)
+**Last Updated:** 2026-09-10 (v1.11.0)

@@ -6,6 +6,11 @@
 #include "UartSerial.h"
 #include "Logger.h"
 
+// RT4K firmware 1.75+ defaults its USB serial port to 2,000,000 baud (was 115,200)
+static const uint32_t DEFAULT_USB_BAUD = 2000000;
+// RT4K HD-15 serial port baud rate
+static const uint32_t DEFAULT_UART_BAUD = 115200;
+
 RetroTink::RetroTink()
     : _serial(nullptr)
     , _lastCommand("")
@@ -58,16 +63,24 @@ void RetroTink::configure(const JsonObject& config) {
         uint8_t txPin = config["txPin"] | 17;
         uint8_t rxPin = config["rxPin"] | 18;
 
-        LOG_DEBUG("RetroTink: Configuring UART mode (UART%d, TX=%d, RX=%d)",
-                  uartId, txPin, rxPin);
+        uint32_t baud = config["baudRate"] | DEFAULT_UART_BAUD;
 
-        // RetroTink uses 115200 baud
-        _serial = new UartSerial(uartId, rxPin, txPin, 115200);
+        LOG_DEBUG("RetroTink: Configuring UART mode (UART%d, TX=%d, RX=%d, %lu baud)",
+                  uartId, txPin, rxPin, (unsigned long)baud);
+
+        _serial = new UartSerial(uartId, rxPin, txPin, baud);
     } else {
         // USB mode (default)
 #ifndef NO_USB_HOST
-        LOG_DEBUG("RetroTink: Configuring USB Host mode");
-        _serial = new UsbHostSerial();
+        uint32_t baud = config["baudRate"] | DEFAULT_USB_BAUD;
+        if (!UsbHostSerial::isSupportedBaud(baud)) {
+            LOG_ERROR("RetroTink: Unsupported USB baud rate %lu - using %lu",
+                      (unsigned long)baud, (unsigned long)DEFAULT_USB_BAUD);
+            baud = DEFAULT_USB_BAUD;
+        }
+
+        LOG_DEBUG("RetroTink: Configuring USB Host mode (%lu baud)", (unsigned long)baud);
+        _serial = new UsbHostSerial(baud);
 #else
         LOG_ERROR("RetroTink: USB Host not available on this platform. Use serialMode=uart.");
 #endif
@@ -355,6 +368,9 @@ void RetroTink::processReceivedLine(const String& line) {
         LOG_INFO("RetroTink: RT4K powering off - power state: SLEEPING");
         return;
     }
+
+    // Anything else - including new or undocumented output from newer RT4K
+    // firmware (expanded serial interface in 1.75+) - is informational only
 }
 
 void RetroTink::processIncomingData() {
