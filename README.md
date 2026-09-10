@@ -1,6 +1,6 @@
 # TinkLink-USB
 
-> **Current Version**: 1.10.0
+> **Current Version**: 1.11.0
 
 An ESP32-based bridge between video switchers and the RetroTINK 4K.
 
@@ -19,7 +19,7 @@ The original [TinkLink](https://github.com/Patrick-Working/tink-link) project us
 - ✅ Single USB OTG cable provides both power and communication
 - ✅ No custom adapters or level shifters needed
 - ✅ RetroTINK's USB serial uses FTDI FT232R chip (standard USB-to-serial)
-- ✅ Native 115200 baud communication (RetroTINK's native speed)
+- ✅ 2 Mbaud USB serial (RetroTINK 4K firmware 1.75+ default; configurable for older firmware)
 
 ## Features
 
@@ -133,7 +133,7 @@ build_flags =
 - Connect ESP32-S3 USB OTG port to RetroTINK USB-C port
 - Use USB OTG cable with power support
 - RetroTINK appears as FTDI FT232R device (`/dev/ttyUSB0` on Linux)
-- Serial settings: 115200 baud, 8N1
+- Serial settings: 2,000,000 baud, 8N1 (RetroTINK firmware 1.75+; set `tink.baudRate` to `115200` for older firmware)
 
 **Extron SW VGA (via RS-232):**
 - Requires RS-232 level shifter (3.3V ↔ RS-232 voltage levels)
@@ -164,8 +164,11 @@ SVS NEW INPUT=2\r\n    # Switch to input 2 and load S2_*.rt4 profile
 ```
 
 **Serial Settings:**
-- Baud Rate: 115200
+- Baud Rate (USB): 2,000,000 — default since RetroTINK 4K firmware 1.75 (earlier firmware: 115200)
+- Baud Rate (HD-15): 115200
 - Data Format: 8N1 (8 data bits, no parity, 1 stop bit)
+
+Firmware 1.75 also expanded the serial control interface. It acknowledges commands (e.g. `[COM] Serial Remote: prof1`) and rejects unknown ones with `[COM] Bad Command: <text>`. TinkLink only uses the commands above; any other output from the RetroTINK is logged and ignored.
 
 **Reference**: [RetroTINK-4K Wiki - Serial Communication](https://consolemods.org/wiki/AV:RetroTINK-4K#Serial_Over_USB_/_HD-15)
 
@@ -492,6 +495,15 @@ tink-link-usb/
 ```
 
 ## Changelog
+
+### v1.11.0 — RetroTINK 2 Mbaud USB Serial & AP Mode Recovery Fix
+
+- **RetroTINK 4K firmware 1.75+ support** — USB serial now runs at 2,000,000 baud, the RT4K's new USB-serial default (previously 115,200). New optional `tink.baudRate` setting for older RT4K firmware or custom rates; unsupported USB rates fall back to 2,000,000.
+- **Faster USB receive path** — The FTDI bulk IN endpoint is polled on every loop with 512-byte multi-packet transfers (FTDI status bytes stripped per packet) and a 2 KB receive buffer, so 2 Mbaud bursts don't overflow the FT232R's 256-byte FIFO. FTDI overrun/framing errors are reported in the log (persistent framing errors indicate a baud mismatch).
+- **Tolerates unknown RT4K output** — Firmware 1.75 expanded the serial interface. Unrecognized lines are logged and ignored; overlong or unterminated data is discarded instead of stalling the USB buffer or growing the UART line buffer without bound. UART mode now treats CR or LF as a line end.
+- **AP mode recovery fix** — After a long network outage (e.g. power failure), the device could stay stuck in AP mode indefinitely. `WiFi.status()` kept the previous attempt's "SSID not found" code, so every periodic reconnection attempt after the first was aborted within milliseconds. Attempts now run until connected or timed out.
+- **mDNS restart** — The mDNS responder is restarted on every (re)connect instead of failing with "mDNS setup failed" when already running.
+- **Config backup format 1.1** — Backups now report format version `1.1` for the new `baudRate` field.
 
 ### v1.10.0 — UI Improvements, Config Versioning & Robustness
 

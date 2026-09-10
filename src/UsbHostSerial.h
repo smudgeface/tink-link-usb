@@ -10,17 +10,28 @@
 
 /**
  * Ring buffer size for incoming USB serial data.
- * Stores data received from the FTDI device until consumed.
+ * Stores data received from the FTDI device until consumed. Sized to absorb
+ * bursts of RT4K output at 2 Mbaud between loop() iterations.
  */
-static const size_t USB_RX_BUFFER_SIZE = 512;
+static const size_t USB_RX_BUFFER_SIZE = 2048;
+
+/**
+ * Size of each bulk IN transfer from the FTDI device.
+ * Must be a multiple of the endpoint's max packet size (64 bytes on the
+ * FT232R). Receiving up to 8 packets per poll keeps up with 2 Mbaud output;
+ * the FT232R's own receive FIFO is only 256 bytes.
+ */
+static const size_t USB_RX_TRANSFER_SIZE = 512;
 
 /**
  * USB Host serial driver for FTDI devices (RetroTINK 4K).
  *
  * Subclasses EspUsbHostSerial_FTDI to provide:
- * - Automatic FTDI device detection and initialization at 115200 baud
+ * - Automatic FTDI device detection and initialization at a configurable baud rate
  * - Connection/disconnection tracking with callbacks
+ * - Multi-packet bulk IN transfers, polled on every update()
  * - Ring buffer for incoming data
+ * - FTDI line error (overrun/framing) reporting via the logger
  * - Framed data transmission (max 64 bytes per submit)
  *
  * The RetroTINK 4K uses an FTDI FT232R chip (VID:0x0403, PID:0x6001)
@@ -28,8 +39,8 @@ static const size_t USB_RX_BUFFER_SIZE = 512;
  * USB Host interface.
  *
  * Usage:
- *   UsbHostSerial usb;
- *   usb.begin();                          // Initialize USB Host
+ *   UsbHostSerial usb(2000000);
+ *   usb.initTransport();                  // Initialize USB Host
  *   usb.setOnConnected([]{ ... });        // Optional callbacks
  *   // In loop():
  *   usb.update();                         // Process USB events
@@ -42,11 +53,27 @@ class UsbHostSerial : public EspUsbHostSerial_FTDI, public SerialInterface {
 public:
     using ConnectCallback = std::function<void()>;
 
-    UsbHostSerial();
+    /**
+     * Create the USB Host serial driver.
+     * @param baud FTDI baud rate. Must satisfy isSupportedBaud().
+     */
+    explicit UsbHostSerial(uint32_t baud);
     ~UsbHostSerial();
 
     /**
-     * Initialize USB Host via EspUsbHost::begin() for FTDI communication at 115200 baud.
+     * Check whether a baud rate can be configured on the FTDI device.
+     * EspUsbHostSerial_FTDI only knows the divisors for standard rates and
+     * silently falls back to 9600 baud for anything else.
+     * @param baud Baud rate to check
+     * @return true if the rate is supported
+     */
+    static bool isSupportedBaud(uint32_t baud);
+
+    /** @return Configured FTDI baud rate */
+    uint32_t getBaudRate() const { return _baud; }
+
+    /**
+     * Initialize USB Host via EspUsbHost::begin() for FTDI communication at the configured baud rate.
      * Implements SerialInterface::initTransport().
      * @return true on success
      */
@@ -54,7 +81,8 @@ public:
 
     /**
      * Process USB Host events. Must be called in loop().
-     * Delegates to EspUsbHostSerial_FTDI::task().
+     * Delegates to EspUsbHostSerial_FTDI::task() and periodically logs
+     * FTDI line errors.
      */
     void update() override;
 
@@ -114,8 +142,10 @@ public:
 
     /**
      * Read a line from the receive buffer (up to newline or CR).
+     * If the buffer fills up without a terminator, its contents are returned
+     * as one line so overlong or unterminated data can't stall reception.
      * @param line Output string (without the terminator)
-     * @return true if a complete line was read, false if no complete line available
+     * @return true if a line was read, false if no complete line available
      */
     bool readLine(String& line) override;
 
@@ -138,16 +168,42 @@ protected:
     /** Called by EspUsbHost when the FTDI device is disconnected. */
     void onGone() override;
 
-    /** Called by EspUsbHost when data is received from the FTDI device. */
+    /**
+     * Called by EspUsbHost for each interface/endpoint descriptor.
+     * Replaces the single-packet bulk IN transfer allocated by the base
+     * class with a USB_RX_TRANSFER_SIZE multi-packet transfer.
+     */
+    void onConfig(const uint8_t bDescriptorType, const uint8_t *p) override;
+
+    /**
+     * Called by EspUsbHost when a bulk IN transfer completes.
+     * Strips the 2 FTDI status bytes that lead every packet in the transfer
+     * and records line errors.
+     */
+    void onReceive(usb_transfer_t *transfer) override;
+
+    /** Called with the payload of each received FTDI packet. */
     void onReceive(const uint8_t* data, const size_t length) override;
 
 private:
+    uint32_t _baud;
     volatile bool _connected;
 
     // Ring buffer for received data
     uint8_t _rxBuffer[USB_RX_BUFFER_SIZE];
     volatile size_t _rxHead;
     volatile size_t _rxTail;
+
+    // FTDI packet framing and line error tracking
+    size_t _rxPacketSize;
+    uint32_t _rxOverrunErrors;
+    uint32_t _rxFramingErrors;
+    unsigned long _lastErrorReport;
+
+    static const size_t FTDI_STATUS_BYTES = 2;
+    static const uint8_t FTDI_LSR_OVERRUN = 0x02;
+    static const uint8_t FTDI_LSR_FRAMING = 0x08;
+    static const unsigned long ERROR_REPORT_INTERVAL_MS = 30000;
 
     // Callbacks
     ConnectCallback _onConnected;
@@ -159,6 +215,9 @@ private:
      * @return true if written, false if buffer full
      */
     bool rxBufferWrite(uint8_t byte);
+
+    /** Log accumulated FTDI line errors, at most once per ERROR_REPORT_INTERVAL_MS. */
+    void reportLineErrors();
 };
 
 #endif // NO_USB_HOST

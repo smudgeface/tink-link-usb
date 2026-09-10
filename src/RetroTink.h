@@ -68,8 +68,9 @@ enum class PowerManagementMode {
  *
  * Communicates with the RetroTINK 4K over a SerialInterface transport.
  * Supports two modes:
- * - USB: USB FTDI (default) at 115200 baud 8N1
- * - UART: Hardware UART at 115200 baud 8N1
+ * - USB: USB FTDI (default) at 2,000,000 baud 8N1 (RT4K firmware 1.75+ default)
+ * - UART: Hardware UART (HD-15) at 115200 baud 8N1
+ * Either rate can be overridden with the "baudRate" config field.
  *
  * Features:
  * - Profile switching via SVS or remote commands
@@ -80,6 +81,9 @@ enum class PowerManagementMode {
  * Command framing: "\r<COMMAND>\r"
  * - Leading CR clears any partial input in RT4K's buffer
  * - Trailing CR terminates the command
+ *
+ * RT4K firmware 1.75+ replies to each command, e.g. "[COM] Serial Remote: prof1"
+ * or "[COM] Bad Command: <text>". These replies are logged and otherwise ignored.
  *
  * Usage:
  *   RetroTink tink;
@@ -109,6 +113,8 @@ public:
      * - uartId: UART number (for uart mode, default 2)
      * - txPin: TX GPIO pin (for uart mode, default 17)
      * - rxPin: RX GPIO pin (for uart mode, default 18)
+     * - baudRate: Optional baud rate override (default 2000000 for usb,
+     *   115200 for uart). Unsupported USB rates fall back to 2000000.
      *
      * @param config JSON object containing RetroTINK configuration
      */
@@ -226,7 +232,8 @@ private:
 
     /**
      * Process a complete line received from the RT4K serial output.
-     * Updates power state based on known status messages.
+     * Updates power state based on known status messages. Unrecognized
+     * lines are logged and otherwise ignored.
      * @param line The received line (without terminator)
      */
     void processReceivedLine(const String& line);

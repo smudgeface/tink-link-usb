@@ -6,7 +6,7 @@ This document provides guidelines and conventions for Claude (AI assistant) when
 
 TinkLink-USB is an ESP32-S3 USB bridge between video switchers and the RetroTINK 4K. It automatically triggers RetroTINK profile changes when video switcher inputs change.
 
-**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, SSDP discovery, config backup/restore, and reboot API all functional. Version 1.10.0.
+**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, SSDP discovery, config backup/restore, and reboot API all functional. Version 1.11.0.
 
 **Tech Stack:**
 - Platform: ESP32-S3 (Arduino framework, USB OTG mode)
@@ -64,7 +64,7 @@ Version is stored in `src/version.h`:
 
 ### Config Backup Format Versioning
 
-The config backup JSON includes a `"version"` field using **MAJOR.MINOR** format (currently `"1.0"`). This is **separate from firmware versioning** — it tracks the backup file format, not the firmware release.
+The config backup JSON includes a `"version"` field using **MAJOR.MINOR** format (currently `"1.1"`). This is **separate from firmware versioning** — it tracks the backup file format, not the firmware release.
 
 **Version rules:**
 - **Major bump** = breaking change (removed/renamed properties, type changes). Restore will **reject** backups with a higher major version.
@@ -421,7 +421,7 @@ tink-link-usb/
 ### UART Configuration
 
 - **Switcher UART**: GPIO43 (TX), GPIO44 (RX) @ 9600 baud, 8N1
-- **RetroTINK USB**: USB Host via EspUsbHost library, FTDI FT232R @ 115200 baud
+- **RetroTINK USB**: USB Host via EspUsbHost library, FTDI FT232R @ 2,000,000 baud (RT4K firmware 1.75+ default; was 115200)
 
 ### Important GPIO Pins
 
@@ -452,7 +452,7 @@ Hardware-level settings (switcher type, RetroTink serial mode, pin assignments) 
 
 ### Config Backup Format Versioning
 
-The config backup JSON includes a `"version"` field using **MAJOR.MINOR** format (currently `"1.0"`). This is **separate from firmware versioning** — it tracks the backup file format, not the firmware release.
+The config backup JSON includes a `"version"` field using **MAJOR.MINOR** format (currently `"1.1"`). This is **separate from firmware versioning** — it tracks the backup file format, not the firmware release.
 
 **Version rules:**
 - **Major bump** = breaking change (removed/renamed properties, type changes). Restore will **reject** backups with a higher major version.
@@ -472,4 +472,4 @@ The version constant is in the `handleApiConfigBackup()` method in `WebServer.cp
 
 ---
 
-**Last Updated**: 2026-02-16 (v1.10.0)
+**Last Updated**: 2026-09-10 (v1.11.0)

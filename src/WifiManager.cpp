@@ -249,6 +249,9 @@ void WifiManager::setState(State newState) {
 }
 
 void WifiManager::setupMDNS() {
+    // Restart the responder - MDNS.begin() fails if mDNS is already running,
+    // which happens on every reconnect or AP <-> STA transition
+    MDNS.end();
     if (MDNS.begin(_hostname.c_str())) {
         MDNS.addService("http", "tcp", 80);
         LOG_INFO("WifiManager: mDNS started - http://%s.local", _hostname.c_str());
@@ -381,11 +384,14 @@ void WifiManager::handleApReconnect() {
             return;
         }
 
-        if (status == WL_CONNECT_FAILED ||
-            status == WL_NO_SSID_AVAIL ||
-            (now - _apReconnectStartTime >= AP_RECONNECT_TIMEOUT_MS)) {
-            // Attempt failed or timed out
-            LOG_DEBUG("WifiManager: AP reconnect attempt failed (status: %d)", status);
+        // Only give up on timeout. WiFi.begin() does not reset WiFi.status(),
+        // so a failure code like WL_NO_SSID_AVAIL from the previous attempt is
+        // still reported right after begin(). Treating it as a failure aborted
+        // every attempt after the first, leaving the device stuck in AP mode
+        // after the network had been down for a while.
+        if (now - _apReconnectStartTime >= AP_RECONNECT_TIMEOUT_MS) {
+            LOG_INFO("WifiManager: Reconnect to '%s' failed (status: %d) - retrying in %lus",
+                     _ssid.c_str(), status, AP_RECONNECT_INTERVAL_MS / 1000);
             WiFi.disconnect(false);  // Stop STA attempt, keep AP running
             _apReconnecting = false;
             _lastApReconnectAttempt = now;

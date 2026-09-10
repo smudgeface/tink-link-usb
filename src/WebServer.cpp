@@ -809,7 +809,7 @@ void WebServer::handleApiConfigBackup(AsyncWebServerRequest* request) {
     // Backup format version (MAJOR.MINOR)
     // Major bump = breaking change (removed/renamed fields, type changes)
     // Minor bump = non-breaking change (new fields added)
-    doc["version"] = "1.0";
+    doc["version"] = "1.1";
 
     // Read config.json
     File configFile = LittleFS.open("/config.json", "r");
