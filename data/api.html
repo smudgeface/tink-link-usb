@@ -396,20 +396,22 @@
   "serialMode": "usb",
   "powerManagementMode": "full",
   "baudRate": 2000000,
-  "defaultBaudRate": 2000000
+  "defaultBaudRate": 2000000,
+  "retroBridgeApi": true
 }
 
 // serialMode:          usb or uart (set in config.json, applied at boot)
 // powerManagementMode: off, simple or full (set in config.json, applied at boot)
 // baudRate:            current serial baud rate
-// defaultBaudRate:     default for the serial mode (2000000 for usb, 115200 for uart)</div>
+// defaultBaudRate:     default for the serial mode (2000000 for usb, 115200 for uart)
+// retroBridgeApi:      whether the Retro-Bridge compatible API (/api/v1/*) is enabled</div>
                 </div>
             </div>
 
             <div class="api-endpoint">
                 <span class="api-method post">POST</span>
                 <span class="api-path">/api/config/tink</span>
-                <p class="api-desc">Change the RetroTINK serial baud rate. Applies to the running connection immediately. Setting the serial mode's default rate removes the override from <code>config.json</code>.</p>
+                <p class="api-desc">Change RetroTINK settings. At least one parameter is required; changes apply immediately. Setting the serial mode's default baud rate removes the override from <code>config.json</code>.</p>
                 <div class="api-section">
                     <h4>Parameters</h4>
                     <table class="param-table">
@@ -418,10 +420,15 @@
                             <td><span class="param-name">baudRate</span></td>
                             <td><span class="param-type">int</span></td>
                             <td>
-                                New baud rate<span class="param-required">required</span><br>
+                                New baud rate<br>
                                 USB: 300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600, 1000000, 1500000, 2000000, 3000000<br>
                                 UART: 300 to 5000000
                             </td>
+                        </tr>
+                        <tr>
+                            <td><span class="param-name">retroBridgeApi</span></td>
+                            <td><span class="param-type">bool</span></td>
+                            <td>Enable ("true") or disable ("false") the Retro-Bridge compatible API. Disabling it releases the serial link if an app is using it.</td>
                         </tr>
                     </table>
                 </div>
@@ -429,7 +436,8 @@
                     <h4>Response</h4>
                     <div class="api-example">{
   "status": "ok",
-  "baudRate": 115200
+  "baudRate": 115200,
+  "retroBridgeApi": true
 }</div>
                 </div>
             </div>
@@ -553,6 +561,37 @@
   "command": "remote prof1"
 }</div>
                 </div>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method post">POST</span>
+                <span class="api-path">/api/tink/trigger</span>
+                <p class="api-desc">Run the trigger mapped to a switcher input, exactly as if the switcher had just selected that input: the RetroTINK is woken if it is asleep, and the profile command is sent once it is ready. The switcher itself and the AVR are not touched. Handy for testing trigger mappings. Returns 404 if no trigger is mapped to the input.</p>
+                <div class="api-section">
+                    <h4>Parameters</h4>
+                    <table class="param-table">
+                        <tr><th>Name</th><th>Type</th><th>Description</th></tr>
+                        <tr>
+                            <td><span class="param-name">input</span></td>
+                            <td><span class="param-type">int</span></td>
+                            <td>Switcher input number (1-based)<span class="param-required">required</span></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="api-section">
+                    <h4>Response</h4>
+                    <div class="api-example">{
+  "status": "ok",
+  "input": 1
+}</div>
+                </div>
+            </div>
+
+            <div class="api-endpoint">
+                <span class="api-method get">ANY</span>
+                <span class="api-path">/api/v1/*</span>
+                <p class="api-desc">Retro-Bridge compatible API. Lets apps written for the <a href="https://github.com/solidpipe/retro-bridge" style="color: #00d4ff;">Retro-Bridge</a> WiFi adapter &mdash; the <a href="https://rt4k-profiler.pipe.hr" style="color: #00d4ff;">RT4K Profiler</a> and Remote web apps &mdash; connect to TinkLink by address and talk to the RetroTINK through TinkLink's serial link. In the app, choose <strong>Connect via Retro-Bridge</strong> and enter this device's IP address or <code>.local</code> hostname.</p>
+                <p class="api-desc">TinkLink only relays bytes between the app and the RetroTINK. One app operation uses the serial link at a time; while one is in progress, TinkLink's own commands (input triggers, <code>/api/tink/send</code>) are held back and sent as soon as the link is free. These endpoints are the only ones that send CORS and Private Network Access headers, since the apps are public web pages. This API is meant for those apps rather than for scripting &mdash; use <code>/api/tink/send</code> for that. Disable it with <code>retroBridgeApi</code> under <a href="#config" style="color: #00d4ff;">Configuration</a>.</p>
             </div>
         </div>
 

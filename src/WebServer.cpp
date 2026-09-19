@@ -3,6 +3,7 @@
 #include "ConfigManager.h"
 #include "Switcher.h"
 #include "RetroTink.h"
+#include "SerialInterface.h"
 #include "DenonAvr.h"
 #include "Logger.h"
 #include "version.h"
@@ -57,12 +58,23 @@ void WebServer::end() {
     _server->end();
 }
 
+void WebServer::update() {
+    _bridge.update();
+}
+
 void WebServer::setLEDCallback(LEDControlCallback callback) {
     _ledCallback = callback;
 }
 
 void WebServer::setupRoutes() {
     // API endpoints - register these BEFORE serveStatic to ensure they're matched first
+    // (and don't pay for its filesystem lookups)
+
+    // Retro-Bridge compatible API for the RetroTINK Profiler / Remote apps.
+    // First in line: apps poll it rapidly during file transfers.
+    _bridge.setEnabled(_config->getRetroTinkConfig()["retroBridgeApi"] | true);
+    _bridge.begin(_server, _tink, _wifi);
+
     _server->on("/api/status", HTTP_GET,
         [this](AsyncWebServerRequest* request) { handleApiStatus(request); });
 
@@ -95,6 +107,9 @@ void WebServer::setupRoutes() {
     // RetroTINK endpoints
     _server->on("/api/tink/send", HTTP_POST,
         [this](AsyncWebServerRequest* request) { handleApiTinkSend(request); });
+
+    _server->on("/api/tink/trigger", HTTP_POST,
+        [this](AsyncWebServerRequest* request) { handleApiTinkTrigger(request); });
 
     // Debug endpoints
     _server->on("/api/debug/led", HTTP_POST,
@@ -408,6 +423,7 @@ void WebServer::handleApiConfigTinkGet(AsyncWebServerRequest* request) {
     uint32_t baud = _tink->getBaudRate();
     doc["baudRate"] = baud ? baud : (tinkConfig["baudRate"] | _tink->getDefaultBaudRate());
     doc["defaultBaudRate"] = _tink->getDefaultBaudRate();
+    doc["retroBridgeApi"] = _bridge.isEnabled();
 
     String response;
     serializeJson(doc, response);
@@ -415,42 +431,57 @@ void WebServer::handleApiConfigTinkGet(AsyncWebServerRequest* request) {
 }
 
 void WebServer::handleApiConfigTink(AsyncWebServerRequest* request) {
-    if (!request->hasParam("baudRate", true)) {
-        request->send(400, "application/json", "{\"error\":\"Missing baudRate parameter\"}");
+    bool hasBaud = request->hasParam("baudRate", true);
+    bool hasBridge = request->hasParam("retroBridgeApi", true);
+    if (!hasBaud && !hasBridge) {
+        request->send(400, "application/json", "{\"error\":\"Missing baudRate or retroBridgeApi parameter\"}");
         return;
     }
 
-    long baud = request->getParam("baudRate", true)->value().toInt();
-    if (baud <= 0) {
-        request->send(400, "application/json", "{\"error\":\"Invalid baud rate\"}");
-        return;
-    }
-
-    // Apply live first - the transport validates the rate for its serial mode
-    if (!_tink->setBaudRate((uint32_t)baud)) {
-        request->send(400, "application/json", "{\"error\":\"Baud rate not supported in this serial mode\"}");
-        return;
-    }
-
-    // Persist only non-default rates so each serial mode keeps its own default
     JsonDocument newConfigDoc;
     newConfigDoc.set(_config->getRetroTinkConfig());
-    if ((uint32_t)baud == _tink->getDefaultBaudRate()) {
-        newConfigDoc.remove("baudRate");
-    } else {
-        newConfigDoc["baudRate"] = (uint32_t)baud;
+
+    if (hasBaud) {
+        long baud = request->getParam("baudRate", true)->value().toInt();
+        if (baud <= 0) {
+            request->send(400, "application/json", "{\"error\":\"Invalid baud rate\"}");
+            return;
+        }
+
+        // Apply live first - the transport validates the rate for its serial mode
+        if (!_tink->setBaudRate((uint32_t)baud)) {
+            request->send(400, "application/json", "{\"error\":\"Baud rate not supported in this serial mode\"}");
+            return;
+        }
+
+        // Persist only non-default rates so each serial mode keeps its own default
+        if ((uint32_t)baud == _tink->getDefaultBaudRate()) {
+            newConfigDoc.remove("baudRate");
+        } else {
+            newConfigDoc["baudRate"] = (uint32_t)baud;
+        }
     }
+
+    if (hasBridge) {
+        String value = request->getParam("retroBridgeApi", true)->value();
+        bool enabled = (value == "true" || value == "1");
+        _bridge.setEnabled(enabled);
+        newConfigDoc["retroBridgeApi"] = enabled;
+    }
+
     _config->setRetroTinkConfig(newConfigDoc.as<JsonObject>());
 
     if (_config->saveConfig()) {
         JsonDocument doc;
         doc["status"] = "ok";
-        doc["baudRate"] = baud;
+        doc["baudRate"] = _tink->getBaudRate();
+        doc["retroBridgeApi"] = _bridge.isEnabled();
 
         String response;
         serializeJson(doc, response);
         request->send(200, "application/json", response);
-        LOG_INFO("WebServer: RetroTINK config saved (baudRate: %ld)", baud);
+        LOG_INFO("WebServer: RetroTINK config saved (baudRate: %lu, retroBridgeApi: %s)",
+                 (unsigned long)_tink->getBaudRate(), _bridge.isEnabled() ? "on" : "off");
     } else {
         request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
     }
@@ -481,6 +512,22 @@ void WebServer::handleApiTinkSend(AsyncWebServerRequest* request) {
     String response;
     serializeJson(doc, response);
     request->send(200, "application/json", response);
+}
+
+void WebServer::handleApiTinkTrigger(AsyncWebServerRequest* request) {
+    int input = request->hasParam("input", true) ? request->getParam("input", true)->value().toInt() : 0;
+    if (input <= 0) {
+        request->send(400, "application/json", "{\"error\":\"Input required\"}");
+        return;
+    }
+
+    if (!_tink->requestTrigger(input)) {
+        request->send(404, "application/json", "{\"error\":\"No trigger mapped to this input\"}");
+        return;
+    }
+
+    LOG_DEBUG("WebServer: Trigger requested for input %d", input);
+    request->send(200, "application/json", "{\"status\":\"ok\",\"input\":" + String(input) + "}");
 }
 
 void WebServer::handleApiDebugLED(AsyncWebServerRequest* request) {
@@ -890,7 +937,7 @@ void WebServer::handleApiConfigBackup(AsyncWebServerRequest* request) {
     // Backup format version (MAJOR.MINOR)
     // Major bump = breaking change (removed/renamed fields, type changes)
     // Minor bump = non-breaking change (new fields added)
-    doc["version"] = "1.1";
+    doc["version"] = "1.2";
 
     // Read config.json
     File configFile = LittleFS.open("/config.json", "r");

@@ -95,6 +95,8 @@ void Logger::addToBuffer(LogLevel level, const String& message) {
     entry.level = level;
     entry.message = message;
 
+    xSemaphoreTake(_bufferMutex, portMAX_DELAY);
+
     // Circular buffer: remove oldest if full
     if (_logBuffer.size() >= MAX_LOG_ENTRIES) {
         _logBuffer.erase(_logBuffer.begin());
@@ -102,6 +104,8 @@ void Logger::addToBuffer(LogLevel level, const String& message) {
 
     _logBuffer.push_back(entry);
     _totalCount++;
+
+    xSemaphoreGive(_bufferMutex);
 }
 
 const char* Logger::levelToString(LogLevel level) {
@@ -126,6 +130,7 @@ const char* Logger::levelToShortString(LogLevel level) {
 
 std::vector<LogEntry> Logger::getRecentLogs(int count) {
     std::vector<LogEntry> result;
+    xSemaphoreTake(_bufferMutex, portMAX_DELAY);
 
     int start = 0;
     if ((int)_logBuffer.size() > count) {
@@ -136,14 +141,17 @@ std::vector<LogEntry> Logger::getRecentLogs(int count) {
         result.push_back(_logBuffer[i]);
     }
 
+    xSemaphoreGive(_bufferMutex);
     return result;
 }
 
 std::vector<LogEntry> Logger::getLogsSince(unsigned long sinceIndex, int maxCount) {
     std::vector<LogEntry> result;
+    xSemaphoreTake(_bufferMutex, portMAX_DELAY);
 
     // Calculate how many logs we've received since sinceIndex
     if (_totalCount <= sinceIndex) {
+        xSemaphoreGive(_bufferMutex);
         return result;  // No new logs
     }
 
@@ -163,10 +171,13 @@ std::vector<LogEntry> Logger::getLogsSince(unsigned long sinceIndex, int maxCoun
         result.push_back(_logBuffer[i]);
     }
 
+    xSemaphoreGive(_bufferMutex);
     return result;
 }
 
 void Logger::clearLogs() {
+    xSemaphoreTake(_bufferMutex, portMAX_DELAY);
     _logBuffer.clear();
+    xSemaphoreGive(_bufferMutex);
     // Don't reset _totalCount so clients can detect the clear
 }

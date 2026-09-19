@@ -62,8 +62,9 @@ bool UartSerial::readLine(String& line) {
     while (_hwSerial.available()) {
         char c = _hwSerial.read();
 
-        if (c == '\n' || c == '\r') {
-            // CR or LF marks end of line (empty lines from CR+LF pairs are skipped)
+        if (c == '\n' || c == '\r' || c == '\0') {
+            // CR, LF or NUL marks end of line (empty lines are skipped). NUL: the
+            // RT4K's power-down line break reads as a run of NUL bytes.
             if (_lineBuffer.length() > 0) {
                 line = _lineBuffer;
                 _lineBuffer = "";
@@ -81,6 +82,26 @@ bool UartSerial::readLine(String& line) {
     }
 
     return false;
+}
+
+size_t UartSerial::read(uint8_t* buf, size_t maxLen) {
+    if (!_initialized) return 0;
+
+    size_t count = 0;
+    while (count < maxLen && _hwSerial.available()) {
+        buf[count++] = (uint8_t)_hwSerial.read();
+    }
+    return count;
+}
+
+size_t UartSerial::write(const uint8_t* data, size_t length) {
+    if (!_initialized) return 0;
+    return _hwSerial.write(data, length);
+}
+
+size_t UartSerial::writeAvailable() const {
+    if (!_initialized) return 0;
+    return const_cast<HardwareSerial&>(_hwSerial).availableForWrite();
 }
 
 size_t UartSerial::available() const {

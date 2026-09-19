@@ -277,6 +277,9 @@ void loop() {
     // Process AVR commands and responses
     if (avr) avr->update();
 
+    // Web server housekeeping (Retro-Bridge API timeouts)
+    webServer.update();
+
     // Check for manual LED mode timeout
     unsigned long now = millis();
     if (ledManualMode && (now - ledManualModeStart >= LED_MANUAL_TIMEOUT)) {

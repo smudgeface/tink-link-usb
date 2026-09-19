@@ -1,6 +1,6 @@
 # TinkLink-USB
 
-> **Current Version**: 1.12.0
+> **Current Version**: 1.13.0
 
 An ESP32-based bridge between video switchers and the RetroTINK 4K.
 
@@ -24,7 +24,8 @@ The original [TinkLink](https://github.com/Patrick-Working/tink-link) project us
 ## Features
 
 - **USB Host Communication** - Direct USB serial connection to RetroTINK 4K via FTDI FT232R
-- **RT4K Power State Tracking** - Detects boot complete and power-off events via serial, auto-wakes RT4K when input changes arrive while sleeping
+- **RT4K Profiler & Remote App Support** - Retro-Bridge compatible API: the [RT4K Profiler](https://rt4k-profiler.pipe.hr) and Remote web apps connect to TinkLink by address and edit profiles, manage SD card files and control the RetroTINK over WiFi, sharing the same USB link as the automatic profile switching
+- **RT4K Power State Tracking** - Asks the RT4K for its power state over serial, auto-wakes it when an input change arrives while it sleeps, and sends the profile command the moment it has booted (about 5 seconds)
 - **Signal Detection Auto-Switch** - Parses Extron signal detection messages (`Sig`) to automatically switch inputs when a video source is powered on, with 2-second debounce to filter glitches
 - **SVS & Remote Commands** - Supports both SVS (Scalable Video Switch) and Remote profile loading modes with automatic keep-alive
 - **Denon/Marantz AVR Control** - Automatic power-on and input switching via telnet (TCP port 23) when video switcher input changes
@@ -168,7 +169,20 @@ SVS NEW INPUT=2\r\n    # Switch to input 2 and load S2_*.rt4 profile
 - Baud Rate (HD-15): 115200
 - Data Format: 8N1 (8 data bits, no parity, 1 stop bit)
 
-Firmware 1.75 also expanded the serial control interface. It acknowledges commands (e.g. `[COM] Serial Remote: prof1`) and rejects unknown ones with `[COM] Bad Command: <text>`. TinkLink only uses the commands above; any other output from the RetroTINK is logged and ignored.
+Firmware 1.75 also expanded the serial control interface. It acknowledges commands (e.g. `[COM] Serial Remote: prof1`) and rejects unknown ones with `[COM] Bad Command: <text>`, while SVS commands get no reply. Its status text (`[MCU] Powering Up` and friends) is no longer sent over serial by default.
+
+### Power State
+
+TinkLink's `full` power management mode relies on how firmware 1.75+ answers:
+
+| Sent | RetroTINK state | Reply |
+|------|-----------------|-------|
+| `pwr on` | asleep | `[COM] Power On Requested`, then silence until it has booted (about 5 s) |
+| `pwr on` | on | `[COM] Bad Command: pwr on` |
+| anything else | asleep | nothing |
+| `ver` | on | `[COM] ... FW Version: x.y.z` |
+
+So `pwr on` both wakes the RetroTINK and reveals whether it was asleep, and the first answered `ver` afterwards marks the moment it accepts a profile command. When the RetroTINK powers down, its serial output drops low, which the FTDI chip reports as a line break.
 
 **Reference**: [RetroTINK-4K Wiki - Serial Communication](https://consolemods.org/wiki/AV:RetroTINK-4K#Serial_Over_USB_/_HD-15)
 
@@ -495,6 +509,20 @@ tink-link-usb/
 ```
 
 ## Changelog
+
+### v1.13.0 — Retro-Bridge App Support & Binary-Safe RetroTINK Serial
+
+- **Retro-Bridge compatible API** — The RT4K Profiler and Remote web apps can connect to TinkLink as if it were a [Retro-Bridge](https://github.com/solidpipe/retro-bridge): choose *Connect via Retro-Bridge* in the app and enter TinkLink's IP address or `tinklink.local`. TinkLink relays bytes between the app and the RetroTINK (new `/api/v1/*` endpoints with CORS / Private Network Access headers). Verified on hardware with command exchanges, SD card listings, and file downloads and uploads (up to 867 KB, streamed and acknowledged) checked byte for byte. Can be switched off on the Config page (RetroTINK section) or with `retroBridgeApi`.
+- **HTTP keep-alive for the app API** — The apps make dozens of small requests per operation and drop the connection if one takes more than about two seconds. The web server library closed the connection after every response, so each request paid for a TCP handshake as well; on a weak or noisy WiFi link that extra round trip regularly pushed requests over the limit. ESPAsyncWebServer is now vendored in `lib/` with a small opt-in keep-alive patch (see `lib/ESPAsyncWebServer/TINKLINK_PATCH.md`), used only by `/api/v1/*`. Tested with the real RT4K Profiler on a weak link (about -75 dBm) with periodic 1–1.5 s stalls: the slowest lease read dropped from over 2 s to about 1.3 s. A link that bad can still exceed the apps' limits occasionally (uploads need two round trips because of the browser's CORS preflight), so give TinkLink a decent WiFi signal if you use the apps.
+- **Link sharing** — While an app is using the serial link, TinkLink's own commands (input triggers, keep-alives, `/api/tink/send`) are held back and sent the moment the link is free, so a profile switch can't corrupt a file transfer. Power state tracking keeps working during app sessions.
+- **Binary-safe serial transport** — New raw read/write path next to the line-based one; writes of any length are queued and sent in order (previously limited to 64 bytes per call).
+- **USB receive reliability at 2 Mbaud** — USB events are now handled in dedicated high-priority tasks with several bulk IN transfers kept queued. Previously the FT232R's 256-byte FIFO overran on most bursts over ~2 KB (the driver polled from `loop()` with 1–2 ms gaps); sustained 200 KB/s streams are now received without loss.
+- **RTS/CTS flow control** — Enabled on the FTDI link. The RetroTINK relies on it when receiving at 2 Mbaud; without it anything longer than a short command overran its receiver.
+- **WiFi modem sleep disabled** — Cuts typical request latency from hundreds of milliseconds to tens.
+- **Power management reworked for RT4K firmware 1.75+** — That firmware no longer sends its "Powering Up" / "Boot Sequence Complete" status text over serial, so `full` mode never learned the power state and sent the profile command before a waking RT4K could accept it. TinkLink now uses the command replies instead: every input change first sends `pwr on`, whose reply tells whether the RT4K was asleep; if it was, TinkLink polls until it answers (~5 s) and then sends the profile command. A power-off is detected from the serial line dropping, and a periodic silent probe keeps the reported state current when the RT4K is switched with its remote or button. Older firmware's status text is still understood.
+- **`POST /api/tink/trigger`** — Runs the trigger mapped to a switcher input without touching the switcher or AVR; handy for testing mappings.
+- **Line parsing fix** — The RT4K's power-down line break (a run of NUL bytes) used to be glued to the next line of text and hide it.
+- **Config backup format 1.2** — Adds `tink.retroBridgeApi`.
 
 ### v1.12.0 — RetroTINK Config Page & API Reference Cleanup
 

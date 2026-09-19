@@ -155,7 +155,7 @@ public:
     void setBufferLogLevel(LogLevel level) { _bufferLogLevel = level; }
 
 private:
-    Logger() = default;
+    Logger() : _bufferMutex(xSemaphoreCreateMutex()) {}
     ~Logger() = default;
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
@@ -168,6 +168,10 @@ private:
     static const int MAX_LOG_ENTRIES = 100;
     std::vector<LogEntry> _logBuffer;
     unsigned long _totalCount = 0;
+
+    // Log calls come from several tasks (loop, web server, USB host) while
+    // the web server reads the buffer, so every _logBuffer access is locked
+    SemaphoreHandle_t _bufferMutex;
 
     bool _serialEnabled = true;
     LogLevel _serialLogLevel = LogLevel::DEBUG;

@@ -16,10 +16,27 @@ RetroTink::RetroTink()
     , _defaultBaudRate(DEFAULT_USB_BAUD)
     , _baudFlushAt(0)
     , _lastCommand("")
+    , _rawOpen(false)
+    , _rawBuffer(nullptr)
+    , _rawCapacity(0)
+    , _rawTotal(0)
+    , _rawLastRx(0)
+    , _rawMutex(xSemaphoreCreateMutex())
+    , _rawLineClean(true)
     , _powerMgmtMode(PowerManagementMode::FULL)
     , _powerState(RT4KPowerState::UNKNOWN)
     , _pendingCommand("")
     , _bootWaitStart(0)
+    , _requestedInput(0)
+    , _wakePending(false)
+    , _bootProbing(false)
+    , _comReplySeen(false)
+    , _wasConnected(false)
+    , _nextBootProbe(0)
+    , _nextIdleProbe(0)
+    , _probeSentAt(0)
+    , _probeQuietUntil(0)
+    , _lastBreakCount(0)
     , _lastSvsInput(0)
     , _svsKeepAliveTime(0)
     , _svsKeepAlivePending(false)
@@ -27,6 +44,7 @@ RetroTink::RetroTink()
 }
 
 RetroTink::~RetroTink() {
+    free(_rawBuffer);
     if (_serial) {
         delete _serial;
         _serial = nullptr;
@@ -102,7 +120,16 @@ bool RetroTink::begin() {
         return false;
     }
 
-    LOG_INFO("RetroTink: Controller initialized");
+    // Capture window for the raw channel: PSRAM if the board has it
+    _rawCapacity = RAW_CAPTURE_PSRAM_BYTES;
+    _rawBuffer = (uint8_t*)heap_caps_malloc(_rawCapacity, MALLOC_CAP_SPIRAM);
+    if (!_rawBuffer) {
+        _rawCapacity = RAW_CAPTURE_HEAP_BYTES;
+        _rawBuffer = (uint8_t*)malloc(_rawCapacity);
+    }
+    if (!_rawBuffer) _rawCapacity = 0;
+
+    LOG_INFO("RetroTink: Controller initialized (%u KB raw capture window)", (unsigned)(_rawCapacity / 1024));
     return true;
 }
 
@@ -112,8 +139,31 @@ void RetroTink::update() {
     // Process USB Host events
     _serial->update();
 
-    // Read and parse incoming serial data from RT4K
-    processIncomingData();
+    // Read incoming serial data from RT4K: captured verbatim while the raw
+    // channel is open, otherwise parsed as lines
+    if (_rawOpen) {
+        captureIncomingData();
+    } else {
+        processIncomingData();
+    }
+
+    // Trigger requested from another task (web API)
+    if (_requestedInput > 0) {
+        int input = _requestedInput;
+        _requestedInput = 0;
+        onSwitcherInputChange(input);
+    }
+
+    // Send commands that were held back while the raw channel was open
+    if (!_rawOpen && !_deferredCommands.empty()) {
+        xSemaphoreTake(_rawMutex, portMAX_DELAY);
+        std::vector<String> commands;
+        commands.swap(_deferredCommands);
+        xSemaphoreGive(_rawMutex);
+        for (const String& command : commands) {
+            sendCommand(command);
+        }
+    }
 
     // Handle pending operations (boot timeout, SVS keep-alive)
     processPendingOperations();
@@ -197,60 +247,71 @@ void RetroTink::onSwitcherInputChange(int input) {
         return;
     }
 
-    // FULL mode: complete power state tracking via serial messages
-
-    // Check if RT4K needs to be woken up
-    if (_serial && _powerState == RT4KPowerState::SLEEPING) {
-        // Confirmed sleeping - wake and wait for boot complete
-        LOG_INFO("RetroTink: RT4K is sleeping - sending power on before command");
-        sendCommand("pwr on");
-        _powerState = RT4KPowerState::BOOTING;
-        _pendingCommand = command;
-        _bootWaitStart = millis();
-
-        // If SVS mode, also queue the keep-alive
-        if (trigger->mode == TriggerMapping::SVS) {
-            _lastSvsInput = trigger->profile;
-            _svsKeepAlivePending = false;  // Will be set after pending command fires
-        }
-
-        LOG_INFO("RetroTink: Queued command for after boot: %s", command.c_str());
-        return;
-    }
-
-    if (_serial && _powerState == RT4KPowerState::UNKNOWN) {
-        // Unknown state - send pwr on and wait briefly to see if RT4K responds.
-        LOG_INFO("RetroTink: RT4K state unknown - sending pwr on and waiting for response");
-        sendCommand("pwr on");
-        _powerState = RT4KPowerState::WAKING;
-        _pendingCommand = command;
-        _bootWaitStart = millis();
-
-        if (trigger->mode == TriggerMapping::SVS) {
-            _lastSvsInput = trigger->profile;
-            _svsKeepAlivePending = false;
-        }
-
-        LOG_INFO("RetroTink: Queued command pending wake response: %s", command.c_str());
-        return;
-    }
-
-    // RT4K is on - send command directly
-    sendCommand(command);
-    LOG_INFO("RetroTink: Input %d triggered -> %s", input, command.c_str());
-
-    // For SVS mode, schedule a keep-alive
+    // FULL mode: verify the power state with the RT4K before sending.
+    // The command waits in _pendingCommand until the RT4K is known to be on.
     if (trigger->mode == TriggerMapping::SVS) {
         _lastSvsInput = trigger->profile;
+        _svsKeepAlivePending = false;  // Scheduled when the command is actually sent
+    }
+    _pendingCommand = command;
+    LOG_INFO("RetroTink: Input %d triggered -> %s", input, command.c_str());
+
+    if (_powerState == RT4KPowerState::WAKING || _powerState == RT4KPowerState::BOOTING) {
+        // Already waiting for the RT4K - the newer command simply replaces the queued one
+        LOG_INFO("RetroTink: Still waiting for the RT4K - queued command updated");
+        return;
+    }
+
+    _wakePending = true;  // Started by update(), once the serial link is free
+}
+
+void RetroTink::startWake() {
+    // "pwr on" doubles as a power state query on firmware 1.75+: the RT4K
+    // answers "Power On Requested" if it was asleep and "Bad Command: pwr on"
+    // if it is already on. (A sleeping RT4K ignores every other command.)
+    _wakePending = false;
+    _bootProbing = false;
+    _powerState = RT4KPowerState::WAKING;
+    _bootWaitStart = millis();
+    sendCommand("pwr on");
+}
+
+void RetroTink::sendPendingCommand() {
+    if (_pendingCommand.length() == 0) return;
+
+    LOG_INFO("RetroTink: Sending queued command: %s", _pendingCommand.c_str());
+    sendCommand(_pendingCommand);
+
+    // For SVS mode, schedule a keep-alive
+    if (_pendingCommand.startsWith("SVS NEW INPUT=")) {
         _svsKeepAliveTime = millis();
         _svsKeepAlivePending = true;
-        LOG_DEBUG("RetroTink: SVS keep-alive scheduled for input %d", _lastSvsInput);
     }
+    _pendingCommand = "";
+}
+
+void RetroTink::setPowerState(RT4KPowerState state, const char* reason) {
+    if (_powerState == state) return;
+    _powerState = state;
+    LOG_INFO("RetroTink: Power state: %s (%s)", getPowerStateString(), reason);
+}
+
+bool RetroTink::requestTrigger(int input) {
+    if (!findTrigger(input)) return false;
+    _requestedInput = input;
+    return true;
 }
 
 void RetroTink::sendRawCommand(const String& command) {
     sendCommand(command);
     LOG_DEBUG("RetroTink: Raw command sent: %s", command.c_str());
+}
+
+String RetroTink::getLastCommand() const {
+    xSemaphoreTake(_rawMutex, portMAX_DELAY);
+    String command = _lastCommand;
+    xSemaphoreGive(_rawMutex);
+    return command;
 }
 
 bool RetroTink::isConnected() const {
@@ -308,7 +369,22 @@ String RetroTink::generateCommand(const TriggerMapping& trigger) const {
 }
 
 void RetroTink::sendCommand(const String& command) {
+    // Commands come from the loop task and from web server tasks
+    xSemaphoreTake(_rawMutex, portMAX_DELAY);
     _lastCommand = command;
+    xSemaphoreGive(_rawMutex);
+
+    if (_rawOpen) {
+        // An app owns the serial link - hold the command until it lets go
+        xSemaphoreTake(_rawMutex, portMAX_DELAY);
+        if (_deferredCommands.size() >= DEFERRED_COMMANDS_MAX) {
+            _deferredCommands.erase(_deferredCommands.begin());
+        }
+        _deferredCommands.push_back(command);
+        xSemaphoreGive(_rawMutex);
+        LOG_INFO("RetroTink: Serial link in use - command deferred: %s", command.c_str());
+        return;
+    }
 
     if (_serial && _serial->isConnected()) {
         // Frame command with leading/trailing CR for RT4K protocol
@@ -330,66 +406,82 @@ void RetroTink::processReceivedLine(const String& line) {
     // corrupting JSON API responses (garbled bytes arrive during RT4K power transitions)
     String clean;
     clean.reserve(line.length());
+    unsigned int unprintable = 0;
     for (unsigned int i = 0; i < line.length(); i++) {
         char c = line.charAt(i);
         if (c >= 0x20 && c < 0x7F) {
             clean += c;
         } else {
             clean += '?';
+            unprintable++;
         }
     }
 
-    LOG_DEBUG("RetroTink RX: %s", clean.c_str());
+    // Mostly unprintable = binary data, e.g. the rest of a file transfer an
+    // app abandoned. Nothing to parse, and logging it would flush the log.
+    if (unprintable * 4 > line.length()) return;
 
-    // Check for "Powering Up" message - RT4K is waking from sleep
+    // Replies to our own status probes are housekeeping, not news
+    bool probeReply = (long)(millis() - _probeQuietUntil) < 0 &&
+                      (line.indexOf("FW Version:") >= 0 || line.indexOf("Build tag:") >= 0);
+    if (!probeReply) {
+        LOG_DEBUG("RetroTink RX: %s", clean.c_str());
+    }
+
+    if (_powerMgmtMode == PowerManagementMode::OFF) return;
+
+    // --- Firmware 1.75+: every command gets a "[COM] " reply while the RT4K
+    // is on, and a sleeping RT4K answers nothing but "pwr on" ---
+    if (_powerMgmtMode == PowerManagementMode::FULL && line.startsWith("[COM] ")) {
+        _comReplySeen = true;
+        _probeSentAt = 0;
+
+        if (line.indexOf("Power On Requested") >= 0) {
+            // It was asleep. It starts answering again once it has booted,
+            // which processPendingOperations() probes for.
+            setPowerState(RT4KPowerState::BOOTING, "RT4K was asleep and is waking up");
+            _bootWaitStart = millis();
+            _bootProbing = true;
+            _nextBootProbe = millis() + BOOT_PROBE_DELAY_MS;
+            return;
+        }
+
+        if (line.endsWith("Serial Remote: pwr")) {
+            // The power button toggles, but a sleeping RT4K wouldn't have answered: it was on
+            setPowerState(RT4KPowerState::SLEEPING, "power toggled over serial");
+            return;
+        }
+
+        // Anything else (including "Bad Command: pwr on", the reply to our
+        // wake/query while it is already on) means the RT4K is up
+        setPowerState(RT4KPowerState::ON, "RT4K is answering");
+        _bootProbing = false;
+        _bootWaitStart = 0;
+        sendPendingCommand();
+        return;
+    }
+
+    // --- Older firmware: unsolicited status text ---
     if (line.indexOf("Powering Up") >= 0) {
-        if (_powerState == RT4KPowerState::WAKING) {
-            // We were in UNKNOWN and sent pwr on - RT4K was actually off
-            LOG_INFO("RetroTink: RT4K powering up confirmed - transitioning to BOOTING");
-            _powerState = RT4KPowerState::BOOTING;
-            // _bootWaitStart already set, _pendingCommand already queued
-        } else if (_powerState != RT4KPowerState::BOOTING) {
-            // Spontaneous power-on (e.g., user pressed physical button)
-            LOG_INFO("RetroTink: RT4K powering up - power state: BOOTING");
-            _powerState = RT4KPowerState::BOOTING;
+        if (_powerState != RT4KPowerState::BOOTING) {
+            setPowerState(RT4KPowerState::BOOTING, "RT4K reports powering up");
             _bootWaitStart = millis();
         }
         return;
     }
 
-    // Check for boot complete message
-    if (line.indexOf("[MCU] Boot Sequence Complete") >= 0) {
-        RT4KPowerState prevState = _powerState;
-        _powerState = RT4KPowerState::ON;
-        LOG_INFO("RetroTink: RT4K boot complete - power state: ON");
-
-        // If we were waiting for boot to complete, send the pending command
-        if ((prevState == RT4KPowerState::BOOTING || prevState == RT4KPowerState::WAKING)
-            && _pendingCommand.length() > 0) {
-            LOG_INFO("RetroTink: Sending queued command: %s", _pendingCommand.c_str());
-            sendCommand(_pendingCommand);
-
-            // If it was an SVS command, schedule keep-alive
-            if (_pendingCommand.startsWith("SVS NEW INPUT=")) {
-                _svsKeepAliveTime = millis();
-                _svsKeepAlivePending = true;
-            }
-
-            _pendingCommand = "";
-            _bootWaitStart = 0;
-        }
+    if (line.indexOf("Boot Sequence Complete") >= 0) {
+        setPowerState(RT4KPowerState::ON, "RT4K reports boot complete");
+        _bootProbing = false;
+        _bootWaitStart = 0;
+        sendPendingCommand();
         return;
     }
 
-    // Check for power off / sleep messages
     if (line.indexOf("Power Off") >= 0 || line.indexOf("Entering Sleep") >= 0) {
-        _powerState = RT4KPowerState::SLEEPING;
-        LOG_INFO("RetroTink: RT4K powering off - power state: SLEEPING");
+        setPowerState(RT4KPowerState::SLEEPING, "RT4K reports power off");
         return;
     }
-
-    // Anything else - including new or undocumented output from newer RT4K
-    // firmware (expanded serial interface in 1.75+) - is informational only
 }
 
 void RetroTink::processIncomingData() {
@@ -398,6 +490,180 @@ void RetroTink::processIncomingData() {
     String line;
     while (_serial->readLine(line)) {
         processReceivedLine(line);
+    }
+}
+
+bool RetroTink::rawOpen() {
+    if (!_serial || _rawOpen) return false;
+
+    xSemaphoreTake(_rawMutex, portMAX_DELAY);
+    _rawTotal = 0;
+    _rawLastRx = millis();
+    bool ok = (_rawBuffer != nullptr);
+    _rawOpen = ok;
+    xSemaphoreGive(_rawMutex);
+
+    if (ok) {
+        LOG_DEBUG("RetroTink: Raw channel opened (%u byte capture window)", (unsigned)_rawCapacity);
+    } else {
+        LOG_ERROR("RetroTink: Raw channel - out of memory");
+    }
+    return ok;
+}
+
+void RetroTink::rawClose() {
+    if (!_rawOpen) return;
+    _rawOpen = false;
+    LOG_DEBUG("RetroTink: Raw channel closed (%lu bytes captured)", (unsigned long)_rawTotal);
+    // Held-back commands are sent by update() (loop task)
+}
+
+size_t RetroTink::rawWrite(const uint8_t* data, size_t length) {
+    if (!_serial || !_rawOpen) return 0;
+    return _serial->write(data, length);
+}
+
+size_t RetroTink::rawRead(uint32_t cursor, uint8_t* buf, size_t maxLen, bool& overflow, uint32_t& nextCursor) {
+    overflow = false;
+    nextCursor = cursor;
+    if (!_rawBuffer) return 0;
+
+    xSemaphoreTake(_rawMutex, portMAX_DELAY);
+    uint32_t total = _rawTotal;
+    uint32_t oldest = (total > _rawCapacity) ? total - _rawCapacity : 0;
+    if (cursor < oldest) {
+        overflow = true;
+        cursor = oldest;
+    }
+    if (cursor > total) cursor = total;
+
+    size_t count = total - cursor;
+    if (count > maxLen) count = maxLen;
+    for (size_t i = 0; i < count; i++) {
+        buf[i] = _rawBuffer[(cursor + i) % _rawCapacity];
+    }
+    xSemaphoreGive(_rawMutex);
+
+    nextCursor = cursor + count;
+    return count;
+}
+
+void RetroTink::captureIncomingData() {
+    uint8_t chunk[256];
+    size_t n;
+    while ((n = _serial->read(chunk, sizeof(chunk))) > 0) {
+        xSemaphoreTake(_rawMutex, portMAX_DELAY);
+        for (size_t i = 0; i < n; i++) {
+            _rawBuffer[(_rawTotal + i) % _rawCapacity] = chunk[i];
+        }
+        _rawTotal += n;
+        _rawLastRx = millis();
+        xSemaphoreGive(_rawMutex);
+
+        scanCapturedText(chunk, n);
+    }
+}
+
+void RetroTink::scanCapturedText(const uint8_t* data, size_t length) {
+    for (size_t i = 0; i < length; i++) {
+        uint8_t c = data[i];
+        if (c == '\n' || c == '\r') {
+            if (_rawLineClean && _rawLineBuffer.length() > 0) {
+                processReceivedLine(_rawLineBuffer);
+            }
+            _rawLineBuffer = "";
+            _rawLineClean = true;
+        } else if (c < 0x20 || c >= 0x7F || _rawLineBuffer.length() >= RAW_LINE_MAX) {
+            // Binary data (or not a status line) - ignore up to the next terminator
+            _rawLineClean = false;
+            _rawLineBuffer = "";
+        } else if (_rawLineClean) {
+            _rawLineBuffer += (char)c;
+        }
+    }
+}
+
+void RetroTink::processPowerTracking(unsigned long now) {
+    // The RT4K's serial output drops low when it powers down
+    uint32_t breaks = _serial->getRxBreakCount();
+    if (breaks != _lastBreakCount) {
+        _lastBreakCount = breaks;
+        if (_powerState == RT4KPowerState::ON || _powerState == RT4KPowerState::UNKNOWN) {
+            setPowerState(RT4KPowerState::SLEEPING, "serial line dropped");
+        }
+    }
+
+    if (!_serial->isConnected()) {
+        if (_powerState != RT4KPowerState::UNKNOWN) setPowerState(RT4KPowerState::UNKNOWN, "serial link down");
+        if (_pendingCommand.length() > 0) _wakePending = true;  // Retry when the link is back
+        _wasConnected = false;
+        _probeSentAt = 0;
+        return;
+    }
+    if (!_wasConnected) {
+        // Link just came up: find out where the RT4K stands
+        _wasConnected = true;
+        _nextIdleProbe = now + CONNECT_PROBE_DELAY_MS;
+    }
+
+    // An input change is waiting for the serial link (an app was using it)
+    if (_wakePending) {
+        startWake();
+        return;
+    }
+
+    switch (_powerState) {
+        case RT4KPowerState::WAKING:
+            if (now - _bootWaitStart >= WAKE_RESPONSE_TIMEOUT_MS) {
+                // No answer to "pwr on". Firmware before 1.75 never answers,
+                // and would have printed "Powering Up" by now if it had been
+                // asleep - so send the command. On newer firmware the RT4K
+                // is unreachable and the command is a long shot either way.
+                LOG_WARN("RetroTink: No reply to pwr on after %lu ms - sending command anyway",
+                         WAKE_RESPONSE_TIMEOUT_MS);
+                _bootWaitStart = 0;
+                _powerState = _comReplySeen ? RT4KPowerState::UNKNOWN : RT4KPowerState::ON;
+                sendPendingCommand();
+            }
+            break;
+
+        case RT4KPowerState::BOOTING:
+            if (now - _bootWaitStart >= BOOT_TIMEOUT_MS) {
+                LOG_WARN("RetroTink: Boot timeout (%lu ms) - sending pending command anyway", BOOT_TIMEOUT_MS);
+                _bootWaitStart = 0;
+                _bootProbing = false;
+                _powerState = RT4KPowerState::UNKNOWN;
+                sendPendingCommand();
+            } else if (_bootProbing && (long)(now - _nextBootProbe) >= 0) {
+                // The RT4K ignores commands until it has booted; the first
+                // reply marks the moment it accepts a profile command
+                _nextBootProbe = now + BOOT_PROBE_INTERVAL_MS;
+                sendProbe();
+            }
+            break;
+
+        default:
+            // Idle: keep the reported state honest. The RT4K can be switched
+            // on or off with its remote or power button without telling us.
+            if (_probeSentAt && now - _probeSentAt >= PROBE_REPLY_TIMEOUT_MS) {
+                _probeSentAt = 0;
+                if (_comReplySeen) setPowerState(RT4KPowerState::SLEEPING, "RT4K stopped answering");
+            }
+            if ((long)(now - _nextIdleProbe) >= 0) {
+                _nextIdleProbe = now + IDLE_PROBE_INTERVAL_MS;
+                sendProbe();
+            }
+            break;
+    }
+}
+
+void RetroTink::sendProbe() {
+    // Sent outside sendCommand(): probes are housekeeping, so they don't
+    // show up as the last command and aren't logged
+    if (_rawOpen || !_serial->isConnected()) return;
+    if (_serial->sendData(String("\rver\r"))) {
+        _probeSentAt = millis();
+        _probeQuietUntil = _probeSentAt + PROBE_REPLY_TIMEOUT_MS;
     }
 }
 
@@ -413,54 +679,16 @@ void RetroTink::processPendingOperations() {
         }
     }
 
-    // Check for wake response timeout (UNKNOWN -> pwr on sent, waiting for RT4K response)
-    if (_powerState == RT4KPowerState::WAKING && _bootWaitStart > 0) {
-        if (now - _bootWaitStart >= WAKE_RESPONSE_TIMEOUT_MS) {
-            // No "Powering Up" response - RT4K was already on
-            LOG_INFO("RetroTink: No wake response after %lu ms - RT4K is already on",
-                     WAKE_RESPONSE_TIMEOUT_MS);
-            _powerState = RT4KPowerState::ON;
-
-            if (_pendingCommand.length() > 0) {
-                LOG_INFO("RetroTink: Sending queued command: %s", _pendingCommand.c_str());
-                sendCommand(_pendingCommand);
-
-                if (_pendingCommand.startsWith("SVS NEW INPUT=")) {
-                    _svsKeepAliveTime = millis();
-                    _svsKeepAlivePending = true;
-                }
-
-                _pendingCommand = "";
-            }
-
-            _bootWaitStart = 0;
-        }
+    if (_powerMgmtMode == PowerManagementMode::FULL && !_rawOpen) {
+        processPowerTracking(now);
     }
 
-    // Check for boot timeout
-    if (_powerState == RT4KPowerState::BOOTING && _bootWaitStart > 0) {
-        if (now - _bootWaitStart >= BOOT_TIMEOUT_MS) {
-            LOG_WARN("RetroTink: Boot timeout (%lu ms) - sending pending command anyway",
-                     BOOT_TIMEOUT_MS);
-
-            if (_pendingCommand.length() > 0) {
-                sendCommand(_pendingCommand);
-
-                // Schedule SVS keep-alive if applicable
-                if (_pendingCommand.startsWith("SVS NEW INPUT=")) {
-                    _svsKeepAliveTime = millis();
-                    _svsKeepAlivePending = true;
-                }
-
-                _pendingCommand = "";
-            }
-
-            _bootWaitStart = 0;
-            // SIMPLE mode: assume ON after boot timeout (no serial feedback expected)
-            // FULL mode: reset to UNKNOWN since we didn't get boot complete message
-            _powerState = (_powerMgmtMode == PowerManagementMode::SIMPLE)
-                ? RT4KPowerState::ON : RT4KPowerState::UNKNOWN;
-        }
+    // SIMPLE mode: fixed wait after the one-time "pwr on"
+    if (_powerMgmtMode == PowerManagementMode::SIMPLE && _powerState == RT4KPowerState::BOOTING &&
+        _bootWaitStart > 0 && now - _bootWaitStart >= BOOT_TIMEOUT_MS) {
+        _bootWaitStart = 0;
+        _powerState = RT4KPowerState::ON;  // No serial feedback expected - assume it booted
+        sendPendingCommand();
     }
 
     // Check for SVS keep-alive

@@ -160,6 +160,20 @@
                     RetroTINK 4K firmware 1.75 and later uses <strong>2,000,000</strong> baud over USB.
                     Earlier firmware and the HD-15 serial port use <strong>115,200</strong>.
                 </div>
+                <div class="toggle-row">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="tink-bridge-api">
+                        <span class="slider"></span>
+                    </label>
+                    <span>Retro-Bridge app support</span>
+                </div>
+                <div class="message info">
+                    Lets the <a href="https://rt4k-profiler.pipe.hr" target="_blank" rel="noopener">RT4K Profiler</a>
+                    and Remote web apps connect to TinkLink as if it were a Retro-Bridge: choose
+                    <strong>Connect via Retro-Bridge</strong> in the app and enter
+                    <strong id="tink-bridge-address">this device's address</strong>.
+                    While enabled, web pages you allow to reach your local network can control the RetroTINK.
+                </div>
                 <div class="btn-row">
                     <button type="submit">Save RetroTINK Config</button>
                 </div>
@@ -713,6 +727,8 @@
                         return `<option value="${rate}">${label}</option>`;
                     }).join('');
                     select.value = data.baudRate;
+                    document.getElementById('tink-bridge-api').checked = data.retroBridgeApi !== false;
+                    document.getElementById('tink-bridge-address').textContent = window.location.hostname;
                 })
                 .catch(err => console.error('Failed to load RetroTINK config:', err));
         }
@@ -722,6 +738,7 @@
 
             const formData = new FormData();
             formData.append('baudRate', document.getElementById('tink-baud').value);
+            formData.append('retroBridgeApi', document.getElementById('tink-bridge-api').checked ? 'true' : 'false');
 
             fetch('/api/config/tink', {
                 method: 'POST',

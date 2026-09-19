@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
 #include <functional>
+#include "RetroBridge.h"
 
 class WifiManager;
 class ConfigManager;
@@ -50,6 +51,8 @@ enum class OTAMode {
  * - GET  /api/config/backup      - Download config.json + wifi.json
  * - POST /api/config/restore     - Restore config from backup JSON
  * - POST /api/tink/send          - Send command to RetroTINK
+ * - POST /api/tink/trigger       - Run the trigger mapped to a switcher input
+ * - *    /api/v1/*               - Retro-Bridge compatible API (see RetroBridge)
  * - GET  /api/avr/discover       - Discover AVRs via SSDP
  * - POST /api/avr/send           - Send command to AVR
  * - POST /api/switcher/send      - Send message to video switcher
@@ -83,6 +86,9 @@ public:
     /** Stop the web server. */
     void end();
 
+    /** Periodic housekeeping (Retro-Bridge API timeouts). Must be called in loop(). */
+    void update();
+
     /**
      * Set callback for LED control from debug interface.
      * @param callback Function to call for LED color changes
@@ -98,6 +104,7 @@ private:
     DenonAvr** _avrPtr;  // Pointer-to-pointer so we can create/destroy at runtime
     DenonAvr* avr() const { return _avrPtr ? *_avrPtr : nullptr; }
     LEDControlCallback _ledCallback;
+    RetroBridge _bridge;  // Retro-Bridge compatible API (/api/v1/*)
 
     // OTA state
     OTAMode _otaMode;
@@ -124,6 +131,7 @@ private:
     void handleApiConfigTink(AsyncWebServerRequest* request);
     void handleApiConfigTinkGet(AsyncWebServerRequest* request);
     void handleApiTinkSend(AsyncWebServerRequest* request);
+    void handleApiTinkTrigger(AsyncWebServerRequest* request);
     void handleApiDebugLED(AsyncWebServerRequest* request);
     void handleApiSwitcherSend(AsyncWebServerRequest* request);
     void handleApiSwitcherReceive(AsyncWebServerRequest* request);
