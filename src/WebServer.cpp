@@ -201,6 +201,8 @@ void WebServer::handleApiStatus(AsyncWebServerRequest* request) {
     doc["wifi"]["ip"] = _wifi->getIP();
     doc["wifi"]["rssi"] = _wifi->getRSSI();
     doc["wifi"]["hostname"] = WiFi.getHostname();
+    doc["wifi"]["mdnsName"] = _wifi->getMdnsName();
+    doc["wifi"]["ipv6"] = (_wifi->getMode() == WifiManager::Mode::AP ? WiFi.softAPIPv6() : WiFi.localIPv6()).toString();
 
     const char* stateStr = "unknown";
     switch (_wifi->getState()) {

@@ -6,7 +6,7 @@ This document provides guidelines and conventions for Claude (AI assistant) when
 
 TinkLink-USB is an ESP32-S3 USB bridge between video switchers and the RetroTINK 4K. It automatically triggers RetroTINK profile changes when video switcher inputs change.
 
-**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, SSDP discovery, config backup/restore, reboot API, and the Retro-Bridge compatible API (RT4K Profiler / Remote app support) all functional. Version 1.13.0.
+**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, SSDP discovery, config backup/restore, reboot API, and the Retro-Bridge compatible API (RT4K Profiler / Remote app support) all functional. Version 1.13.1.
 
 **Tech Stack:**
 - Platform: ESP32-S3 (Arduino framework, USB OTG mode)
@@ -369,6 +369,12 @@ The DHCP hostname requires careful handling on ESP32 Arduino:
   with the default hostname, bypassing application code. Auto-reconnect is disabled;
   all reconnection is handled by WifiManager's state machine.
 
+### mDNS and IPv6
+
+- Apple's resolver queries A and AAAA for `.local` names together and waits for both. The IDF mDNS responder only answers AAAA when the interface has an IPv6 address (it can't send a negative NSEC answer), so without one **every lookup of `tinklink.local` takes exactly 5 s**. `WifiManager::setupMDNS()` therefore calls `WiFi.enableIpV6()` / `WiFi.softAPenableIpV6()` (link-local only) on every connect and mode change. Don't remove it. Check with `curl -w '%{time_namelookup}' http://tinklink.local/api/v1/info` (expect a few ms).
+- Clients prefer the IPv6 address once it is advertised, so every TCP server must accept IPv6. **AsyncTCP is vendored in `lib/AsyncTCP/`** with a dual-stack listener patch (see `TINKLINK_PATCH.md` there). `AsyncClient::remoteIP()` returns 0.0.0.0 for IPv6 peers. Any new listener (raw lwIP, `WiFiServer`, ...) needs the same care, or name-based clients will stall on it.
+- The responder renames itself after a name conflict (`tinklink-2`) and this IDF version has no getter; `WifiManager::getMdnsName()` finds the name by probing `mdns_hostname_exists()`.
+
 ### RetroTINK Serial Link Sharing
 
 - `RetroTink::rawOpen()` gives one caller (a Retro-Bridge transaction or lease) exclusive, binary-safe use of the link. While it is open, `sendCommand()` defers TinkLink's own commands until `rawClose()`. Anything new that talks to the RT4K must go through `sendCommand()` or the raw channel, never straight to the transport.
@@ -416,6 +422,7 @@ tink-link-usb/
 │   ├── ota_upload.py  # OTA firmware uploader
 │   └── logs.py        # Remote log viewer
 ├── lib/
+│   ├── AsyncTCP/          # Vendored TCP library with TinkLink's dual-stack (IPv4 + IPv6) patch
 │   └── ESPAsyncWebServer/ # Vendored web server library with TinkLink's keep-alive patch
 ├── platformio.ini     # PlatformIO configuration
 ├── README.md          # User documentation
@@ -489,4 +496,4 @@ The version constant is in the `handleApiConfigBackup()` method in `WebServer.cp
 
 ---
 
-**Last Updated**: 2026-09-19 (v1.13.0)
+**Last Updated**: 2026-09-19 (v1.13.1)

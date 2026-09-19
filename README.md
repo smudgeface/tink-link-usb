@@ -1,6 +1,6 @@
 # TinkLink-USB
 
-> **Current Version**: 1.13.0
+> **Current Version**: 1.13.1
 
 An ESP32-based bridge between video switchers and the RetroTINK 4K.
 
@@ -462,6 +462,7 @@ This uploads the HTML, CSS, and config files to the device's LittleFS filesystem
 
 **Solution**:
 - **macOS/Linux**: mDNS should work automatically
+- **Name conflict**: if another device already uses the name, TinkLink becomes `tinklink-2.local` (and so on). The Status page and `/api/status` (`wifi.mdnsName`) show the name in use.
 - **Windows**: Install [Bonjour Print Services](https://support.apple.com/kb/DL999) or use the device's IP address instead
 - **Alternative**: Check your router's DHCP client list for the device's IP address
 
@@ -509,6 +510,12 @@ tink-link-usb/
 ```
 
 ## Changelog
+
+### v1.13.1 — Instant `.local` Lookups (IPv6)
+
+- **`tinklink.local` resolves instantly** — Every lookup of the `.local` name took exactly 5 seconds on macOS and iOS (by IP address: 2 ms). Apple's resolver asks for the IPv4 (A) and IPv6 (AAAA) address together and waits for both answers, and TinkLink never answered the AAAA query. Browsers hid most of this behind their DNS cache, but the RT4K Profiler and Remote apps give up on requests after 2–5 seconds, so connecting by name was unreliable. TinkLink now gives its WiFi interface (station and access point) an IPv6 link-local address, which makes the mDNS responder answer both queries at once: measured on macOS, lookups dropped from 5.00 s to about 3 ms (the first lookup after a few idle minutes needs one mDNS round trip, typically 0.1–0.4 s).
+- **Web server listens on IPv6 as well** — Once the name has an IPv6 address clients prefer it, so the HTTP server has to accept it. AsyncTCP is now vendored in `lib/` with a small dual-stack patch (see `lib/AsyncTCP/TINKLINK_PATCH.md`). Everything still works by IPv4 address as before.
+- **Actual `.local` name reported** — If another device on the network already answers to `tinklink.local`, the mDNS responder renames itself (`tinklink-2.local`, ...). TinkLink now notices, logs a warning, shows the name in use on the Status page, and reports it as `wifi.mdnsName` in `/api/status` (next to the new `wifi.ipv6`).
 
 ### v1.13.0 — Retro-Bridge App Support & Binary-Safe RetroTINK Serial
 

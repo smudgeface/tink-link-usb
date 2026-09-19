@@ -20,6 +20,9 @@ Changes (all marked `TinkLink patch` in the source):
   `AsyncWebServerRequest` instead of waiting for the client to disconnect. Idle keep-alive
   connections are closed after 10 seconds.
 
+`library.json` no longer lists AsyncTCP as a registry dependency: TinkLink uses the patched copy in
+`lib/AsyncTCP/`, and with the entry present PlatformIO downloaded a second, unused copy on every build.
+
 Requests that don't opt in behave exactly as upstream. Only `RetroBridge` opts in.
 
 To update the library: replace `src/` with the new upstream version and re-apply the changes

@@ -191,13 +191,15 @@
                 <div class="api-section">
                     <h4>Response</h4>
                     <div class="api-example">{
-  "version": "1.12.0",
+  "version": "1.13.1",
   "wifi": {
     "connected": true,
     "ssid": "MyNetwork",
     "ip": "192.168.1.100",
     "rssi": -65,
     "hostname": "tinklink",
+    "mdnsName": "tinklink",
+    "ipv6": "fe80:0000:0000:0000:f2f5:bdff:fe12:3456",
     "state": "connected",
     "mode": "sta"
   },
@@ -224,6 +226,8 @@
   ]
 }
 
+// wifi.mdnsName:   the .local name in use; differs from hostname after a name conflict (e.g. "tinklink-2")
+// wifi.ipv6:       IPv6 link-local address (all zeros until it has been assigned)
 // wifi.state:      disconnected, connecting, connected, failed, ap_active
 // wifi.mode:       sta, ap, ap_sta (ap_ssid and ap_ip are added while the access point is active)
 // tink.powerState: unknown, waking, booting, on, sleeping
