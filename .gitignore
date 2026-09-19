@@ -16,3 +16,6 @@
 bin/
 data/wifi.json
 data_c3/wifi.json
+
+# Third-party reference material (not part of this project)
+external/
