@@ -32,6 +32,9 @@ static const String SharedEmptyString = String();
 
 enum { PARSE_REQ_START, PARSE_REQ_HEADERS, PARSE_REQ_BODY, PARSE_REQ_END, PARSE_REQ_FAIL };
 
+// TinkLink patch: how long an idle keep-alive connection is kept open
+static const uint32_t KEEP_ALIVE_IDLE_SECONDS = 10;
+
 AsyncWebServerRequest::AsyncWebServerRequest(AsyncWebServer* s, AsyncClient* c)
   : _client(c)
   , _server(s)
@@ -199,6 +202,16 @@ void AsyncWebServerRequest::_onAck(size_t len, uint32_t time){
   if(_response != NULL){
     if(!_response->_finished()){
       _response->_ack(this, len, time);
+      if(_keepAlive && _response->_finished() && _client != NULL && _client->connected()){
+        // TinkLink patch: response fully acknowledged - reuse the connection.
+        // The new request object takes over all of the client's callbacks.
+        AsyncWebServer* server = _server;
+        AsyncClient* client = _client;
+        client->setRxTimeout(KEEP_ALIVE_IDLE_SECONDS);
+        server->_handleDisconnect(this);  // deletes this request, not the client
+        new AsyncWebServerRequest(server, client);
+        return;
+      }
     } else {
       AsyncWebServerResponse* r = _response;
       _response = NULL;

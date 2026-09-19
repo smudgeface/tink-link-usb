@@ -69,6 +69,9 @@ bool WifiManager::connect(const String& ssid, const String& password) {
     _mode = Mode::STA;
 
     WiFi.begin(ssid.c_str(), password.c_str());
+    // Modem sleep adds 100+ ms to most requests. TinkLink is mains powered
+    // and apps using the Retro-Bridge API make dozens of requests per transfer.
+    WiFi.setSleep(false);
 
     _connectStartTime = millis();
     setState(State::CONNECTING);
@@ -403,6 +406,7 @@ void WifiManager::handleApReconnect() {
             WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
             WiFi.setHostname(_hostname.c_str());
             WiFi.begin(_ssid.c_str(), _password.c_str());
+            WiFi.setSleep(false);
             _apReconnecting = true;
             _apReconnectStartTime = now;
         }

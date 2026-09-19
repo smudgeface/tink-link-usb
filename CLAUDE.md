@@ -6,7 +6,7 @@ This document provides guidelines and conventions for Claude (AI assistant) when
 
 TinkLink-USB is an ESP32-S3 USB bridge between video switchers and the RetroTINK 4K. It automatically triggers RetroTINK profile changes when video switcher inputs change.
 
-**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, SSDP discovery, config backup/restore, and reboot API all functional. Version 1.12.0.
+**Current Status:** Active development. USB Host, WiFi, LED, Web Console, OTA, Denon AVR control, SSDP discovery, config backup/restore, reboot API, and the Retro-Bridge compatible API (RT4K Profiler / Remote app support) all functional. Version 1.13.0.
 
 **Tech Stack:**
 - Platform: ESP32-S3 (Arduino framework, USB OTG mode)
@@ -64,7 +64,7 @@ Version is stored in `src/version.h`:
 
 ### Config Backup Format Versioning
 
-The config backup JSON includes a `"version"` field using **MAJOR.MINOR** format (currently `"1.1"`). This is **separate from firmware versioning** — it tracks the backup file format, not the firmware release.
+The config backup JSON includes a `"version"` field using **MAJOR.MINOR** format (currently `"1.2"`). This is **separate from firmware versioning** — it tracks the backup file format, not the firmware release.
 
 **Version rules:**
 - **Major bump** = breaking change (removed/renamed properties, type changes). Restore will **reject** backups with a higher major version.
@@ -183,6 +183,7 @@ APIs are organized by resource:
 /api/status              - System status
 /api/wifi/*              - WiFi operations
 /api/tink/*              - RetroTINK operations
+/api/v1/*                - Retro-Bridge compatible API (RetroBridge class; for the RT4K Profiler / Remote apps)
 /api/switcher/*          - Video switcher operations
 /api/avr/*               - Denon/Marantz AVR operations
 /api/config/*            - Configuration (triggers, tink, AVR, backup/restore)
@@ -368,6 +369,17 @@ The DHCP hostname requires careful handling on ESP32 Arduino:
   with the default hostname, bypassing application code. Auto-reconnect is disabled;
   all reconnection is handled by WifiManager's state machine.
 
+### RetroTINK Serial Link Sharing
+
+- `RetroTink::rawOpen()` gives one caller (a Retro-Bridge transaction or lease) exclusive, binary-safe use of the link. While it is open, `sendCommand()` defers TinkLink's own commands until `rawClose()`. Anything new that talks to the RT4K must go through `sendCommand()` or the raw channel, never straight to the transport.
+- `UsbHostSerial` handles USB events in its own high-priority tasks and keeps several bulk IN transfers queued. The FT232R's 256-byte FIFO overruns after ~1.3 ms unpolled at 2 Mbaud, so never move receive handling back into `loop()`. The RX ring buffer is single-producer (USB client task) / single-consumer (loop task).
+- RTS/CTS is enabled on the FTDI because the RT4K needs it to receive long writes at 2 Mbaud. The RT4K does not throttle its own output, so the receive path must keep up unaided.
+- Power state (FULL mode) comes from `[COM]` replies, not status text: RT4K firmware 1.75+ no longer sends `[MCU]` lines over serial (`quiet 0` re-enables them but resets on every sleep). `pwr on` answers `Power On Requested` when asleep and `Bad Command: pwr on` when on; a sleeping RT4K ignores everything else; SVS commands never get a reply. Every input change therefore goes `pwr on` -> (poll `ver` if it was asleep, ~5 s) -> profile command. Test with `POST /api/tink/trigger`.
+- CORS / Private Network Access headers are sent on `/api/v1/*` only. Don't add them globally: that would expose WiFi config and OTA to any web page.
+- ESPAsyncWebServer is **vendored in `lib/ESPAsyncWebServer/`** with an opt-in HTTP keep-alive patch (`request->setKeepAlive(true)`, see `TINKLINK_PATCH.md` there); PlatformIO restores registry packages on every build, so it can't be patched in `.pio/libdeps`. Only `RetroBridge` opts in. Keep-alive matters: the Profiler aborts lease reads after 2 s, and without it every request costs an extra round trip.
+- A `no_ack` lease must never report completion early (the app stops reading and the transfer dies). `RetroBridge` reports it when the RT4K's end-of-transfer line is the last thing received, or after 3 s of silence with the app caught up.
+- Retro-Bridge handlers block the web server task while waiting on serial data (bounded, feeding the task watchdog). Keep lease reads short; transactions may take as long as the RT4K takes to answer.
+
 ### Safe Practices
 
 - Never commit credentials or secrets
@@ -396,12 +408,15 @@ tink-link-usb/
 │   ├── TelnetSerial.* # TCP telnet serial transport
 │   ├── ExtronSwVga.*  # Video switcher protocol handler
 │   ├── RetroTink.*    # RetroTINK 4K controller (USB Host)
+│   ├── RetroBridge.*  # Retro-Bridge compatible API (/api/v1/*) over RetroTink's raw channel
 │   ├── DenonAvr.*     # Denon/Marantz AVR controller (telnet + SSDP)
 │   ├── Logger.*       # Centralized logging
 │   └── version.h      # Version definitions
 ├── scripts/           # Helper scripts
 │   ├── ota_upload.py  # OTA firmware uploader
 │   └── logs.py        # Remote log viewer
+├── lib/
+│   └── ESPAsyncWebServer/ # Vendored web server library with TinkLink's keep-alive patch
 ├── platformio.ini     # PlatformIO configuration
 ├── README.md          # User documentation
 ├── CLAUDE.md          # This file (AI assistant guide)
@@ -448,12 +463,13 @@ All user-facing configuration changes must apply immediately without requiring a
 - **AVR enable/disable** — Creates or destroys instance at runtime via `DenonAvr**` pointer-to-pointer
 - **AVR settings** (IP, input) — Reconfigures live instance
 - **RetroTINK baud rate** — Applied to the running serial transport (USB change is deferred to the loop task)
+- **Retro-Bridge API enable** (`tink.retroBridgeApi`) — Toggled live; disabling releases any active lease
 
 Hardware-level settings (switcher type, RetroTink serial mode, pin assignments) are boot-only since they represent physical hardware that doesn't change at runtime.
 
 ### Config Backup Format Versioning
 
-The config backup JSON includes a `"version"` field using **MAJOR.MINOR** format (currently `"1.1"`). This is **separate from firmware versioning** — it tracks the backup file format, not the firmware release.
+The config backup JSON includes a `"version"` field using **MAJOR.MINOR** format (currently `"1.2"`). This is **separate from firmware versioning** — it tracks the backup file format, not the firmware release.
 
 **Version rules:**
 - **Major bump** = breaking change (removed/renamed properties, type changes). Restore will **reject** backups with a higher major version.
@@ -473,4 +489,4 @@ The version constant is in the `handleApiConfigBackup()` method in `WebServer.cp
 
 ---
 
-**Last Updated**: 2026-09-10 (v1.12.0)
+**Last Updated**: 2026-09-19 (v1.13.0)

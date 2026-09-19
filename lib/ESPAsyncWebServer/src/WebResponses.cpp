@@ -175,10 +175,11 @@ AsyncBasicResponse::AsyncBasicResponse(int code, const String& contentType, cons
     if(!_contentType.length())
       _contentType = "text/plain";
   }
-  addHeader("Connection","close");
+  // TinkLink patch: the Connection header is added in _respond()
 }
 
 void AsyncBasicResponse::_respond(AsyncWebServerRequest *request){
+  addHeader("Connection", request->keepAlive() ? "keep-alive" : "close");  // TinkLink patch
   _state = RESPONSE_HEADERS;
   String out = _assembleHead(request->version());
   size_t outLen = out.length();
@@ -255,7 +256,9 @@ AsyncAbstractResponse::AsyncAbstractResponse(AwsTemplateProcessor callback): _ca
 }
 
 void AsyncAbstractResponse::_respond(AsyncWebServerRequest *request){
-  addHeader("Connection","close");
+  // TinkLink patch: keep-alive needs a response whose end the client can tell from its length
+  if(_chunked || !_sendContentLength) request->setKeepAlive(false);
+  addHeader("Connection", request->keepAlive() ? "keep-alive" : "close");
   _head = _assembleHead(request->version());
   _state = RESPONSE_HEADERS;
   _ack(request, 0, 0);

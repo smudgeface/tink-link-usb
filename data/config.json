@@ -9,6 +9,7 @@
     "tink": {
         "serialMode": "usb",
         "powerManagementMode": "full",
+        "retroBridgeApi": true,
         "uartId": 2,
         "txPin": 17,
         "rxPin": 18

@@ -28,18 +28,25 @@ struct TriggerMapping {
 };
 
 /**
- * RetroTINK 4K power state.
+ * RetroTINK 4K power state (FULL power management mode).
  *
- * Tracked by parsing serial messages from the RT4K:
- * - "[MCU] Powering Up" -> BOOTING
- * - "[MCU] Boot Sequence Complete..." -> ON
- * - "Power Off" or "Entering Sleep" -> SLEEPING
+ * RT4K firmware 1.75+ answers every command with a "[COM] " line while it
+ * is on, and while asleep ignores everything except "pwr on". Its old
+ * unsolicited status text ("[MCU] Powering Up" etc.) is no longer sent over
+ * serial. The state therefore follows the replies:
+ * - "[COM] Power On Requested" (reply to "pwr on" while asleep) -> BOOTING
+ * - any other "[COM] " reply, including "Bad Command: pwr on" -> ON
+ * - "[COM] Serial Remote: pwr", a serial line break, or no reply to a
+ *   status probe -> SLEEPING
+ * The status text of older firmware is still understood:
+ * - "Powering Up" -> BOOTING, "Boot Sequence Complete" -> ON,
+ *   "Power Off" / "Entering Sleep" -> SLEEPING
  */
 enum class RT4KPowerState {
-    UNKNOWN,   ///< Initial state or unable to determine
-    WAKING,    ///< pwr on sent from UNKNOWN state, waiting briefly for RT4K response
-    BOOTING,   ///< RT4K confirmed powering up, waiting for boot complete
-    ON,        ///< Fully booted and ready for commands
+    UNKNOWN,   ///< Not determined yet, or the RT4K can't be reached
+    WAKING,    ///< "pwr on" sent, waiting for the RT4K to say whether it was asleep
+    BOOTING,   ///< RT4K confirmed waking up, waiting for it to accept commands
+    ON,        ///< Booted and answering commands
     SLEEPING   ///< In sleep/standby mode
 };
 
@@ -53,9 +60,11 @@ enum class RT4KPowerState {
  * - SIMPLE: On first input change, sends "pwr on" and waits 15 seconds
  *   before sending the profile command. All subsequent commands are sent
  *   immediately. Suitable when power state messages are not available.
- * - FULL: Tracks RT4K power state via serial messages (Powering Up, Boot
- *   Sequence Complete, Power Off). Requires that the serial connection
- *   provides these status messages. Default mode.
+ * - FULL: Every input change first sends "pwr on", which wakes a sleeping
+ *   RT4K and reveals its power state through the reply; the profile command
+ *   follows as soon as the RT4K is known to accept it (immediately if it
+ *   was on, about 5 s later if it had to boot). Between input changes a
+ *   periodic "ver" probe keeps the reported state current. Default mode.
  */
 enum class PowerManagementMode {
     OFF,     ///< No power management, always send commands immediately
@@ -74,8 +83,9 @@ enum class PowerManagementMode {
  *
  * Features:
  * - Profile switching via SVS or remote commands
- * - Power state tracking (parses RT4K serial output)
- * - Auto-wake: powers on RT4K when input changes during sleep
+ * - Power state tracking (from the RT4K's command replies)
+ * - Auto-wake: powers on RT4K when input changes during sleep, and sends
+ *   the profile command once the RT4K has booted
  * - SVS keep-alive: sends "SVS CURRENT INPUT=N" after initial switch
  *
  * Command framing: "\r<COMMAND>\r"
@@ -156,6 +166,15 @@ public:
     void onSwitcherInputChange(int input);
 
     /**
+     * Run the trigger mapped to a switcher input, as if the switcher had
+     * just selected it (including waking the RT4K if needed). Safe to call
+     * from any task; the trigger runs on the next update().
+     * @param input Switcher input number (1-based)
+     * @return false if no trigger is mapped to the input
+     */
+    bool requestTrigger(int input);
+
+    /**
      * Send a raw command string to RetroTINK.
      * Useful for testing from the debug web interface.
      * @param command The command to send (e.g., "remote prof1")
@@ -184,7 +203,7 @@ public:
      * Get the last command that was sent (or would be sent in stub mode).
      * @return The last command string
      */
-    String getLastCommand() const { return _lastCommand; }
+    String getLastCommand() const;
 
     /**
      * Change the serial baud rate at runtime (not persisted).
@@ -204,6 +223,62 @@ public:
      */
     uint32_t getDefaultBaudRate() const { return _defaultBaudRate; }
 
+    /**
+     * Open the raw byte channel to the RT4K, giving the caller exclusive use
+     * of the serial link (used by the Retro-Bridge API). While open:
+     * - received bytes are captured verbatim (binary safe) for rawRead()
+     * - clean text lines in the stream still drive power state tracking
+     * - TinkLink's own commands (triggers, keep-alives, /api/tink/send) are
+     *   held back and sent when the channel closes, so they can't corrupt a
+     *   binary transfer
+     * Safe to call from any task.
+     * @return false if the channel is already open or no serial transport exists
+     */
+    bool rawOpen();
+
+    /** Close the raw byte channel, resume line processing and send held-back commands. */
+    void rawClose();
+
+    /** @return true while the raw byte channel is open */
+    bool isRawOpen() const { return _rawOpen; }
+
+    /**
+     * Queue bytes for transmission to the RT4K exactly as given (no framing).
+     * @param data Bytes to send
+     * @param length Number of bytes
+     * @return Number of bytes accepted by the transport
+     */
+    size_t rawWrite(const uint8_t* data, size_t length);
+
+    /**
+     * Read captured bytes starting at a stream position. The capture is a
+     * sliding window over everything received since rawOpen(); position 0 is
+     * the first byte received.
+     * @param cursor Stream position to read from
+     * @param buf Destination buffer
+     * @param maxLen Maximum bytes to read
+     * @param overflow Set to true if bytes at the cursor were already
+     *        discarded (the read then resumes at the oldest byte still held)
+     * @param nextCursor Set to the stream position following the returned bytes
+     * @return Number of bytes copied into buf
+     */
+    size_t rawRead(uint32_t cursor, uint8_t* buf, size_t maxLen, bool& overflow, uint32_t& nextCursor);
+
+    /**
+     * @return Size of the raw channel's capture window in bytes. Received
+     *         data that is not read before this much more arrives is lost.
+     */
+    size_t rawCapacity() const { return _rawCapacity; }
+
+    /** @return Total bytes captured since rawOpen() */
+    uint32_t rawTotal() const { return _rawTotal; }
+
+    /** @return millis() timestamp of the last captured byte (or of rawOpen() if none yet) */
+    unsigned long rawLastRxTime() const { return _rawLastRx; }
+
+    /** @return The serial transport (for diagnostics), or nullptr if not configured */
+    SerialInterface* getSerial() const { return _serial; }
+
 private:
     SerialInterface* _serial;
     uint32_t _defaultBaudRate;
@@ -216,16 +291,47 @@ private:
     std::vector<TriggerMapping> _triggers;
     String _lastCommand;
 
+    // Raw byte channel: sliding capture window written by the loop task and
+    // read by web server tasks, guarded by _rawMutex
+    volatile bool _rawOpen;
+    uint8_t* _rawBuffer;
+    size_t _rawCapacity;
+    volatile uint32_t _rawTotal;
+    volatile unsigned long _rawLastRx;
+    SemaphoreHandle_t _rawMutex;
+    String _rawLineBuffer;                  // Text line being assembled from the raw stream
+    bool _rawLineClean;                     // false once the line contains non-text bytes
+    std::vector<String> _deferredCommands;  // Commands held back while the channel is open
+    static const size_t RAW_LINE_MAX = 200;
+    static const size_t DEFERRED_COMMANDS_MAX = 8;
+    static const size_t RAW_CAPTURE_PSRAM_BYTES = 1048576;
+    static const size_t RAW_CAPTURE_HEAP_BYTES = 16384;
+
     // Power management
     PowerManagementMode _powerMgmtMode;
     RT4KPowerState _powerState;
     String _serialLineBuffer;
 
-    // Pending command (queued during boot)
+    // Pending command (queued until the RT4K is known to be on)
     String _pendingCommand;
     unsigned long _bootWaitStart;
+    volatile int _requestedInput; // Input whose trigger was requested via requestTrigger() (0 = none)
+    volatile bool _wakePending;   // An input change is waiting for startWake()
+    bool _bootProbing;            // BOOTING on firmware 1.75+: poll until it answers
+    bool _comReplySeen;           // Firmware answers commands (1.75+)
+    bool _wasConnected;
+    unsigned long _nextBootProbe;
+    unsigned long _nextIdleProbe;
+    unsigned long _probeSentAt;     // Status probe awaiting a reply (0 = none)
+    unsigned long _probeQuietUntil; // Probe replies before this time aren't logged
+    uint32_t _lastBreakCount;
     static const unsigned long BOOT_TIMEOUT_MS = 15000;
     static const unsigned long WAKE_RESPONSE_TIMEOUT_MS = 3000;
+    static const unsigned long BOOT_PROBE_DELAY_MS = 2000;     // Boot takes ~5 s; no point asking sooner
+    static const unsigned long BOOT_PROBE_INTERVAL_MS = 500;
+    static const unsigned long IDLE_PROBE_INTERVAL_MS = 30000;
+    static const unsigned long CONNECT_PROBE_DELAY_MS = 1000;
+    static const unsigned long PROBE_REPLY_TIMEOUT_MS = 1500;
 
     // SVS keep-alive
     int _lastSvsInput;
@@ -269,8 +375,37 @@ private:
      */
     void processIncomingData();
 
+    /** Move received bytes into the raw capture window (raw channel open). */
+    void captureIncomingData();
+
     /**
-     * Handle pending operations: boot timeout, SVS keep-alive.
+     * Pick clean text lines out of raw channel data and pass them to
+     * processReceivedLine(), so power state tracking keeps working while an
+     * app owns the link. Lines containing binary data are discarded.
+     */
+    void scanCapturedText(const uint8_t* data, size_t length);
+
+    /** Begin the wake/query sequence for the queued command by sending "pwr on". */
+    void startWake();
+
+    /** Send the queued command, if any, and schedule the SVS keep-alive it may need. */
+    void sendPendingCommand();
+
+    /** Change the power state and log the transition. */
+    void setPowerState(RT4KPowerState state, const char* reason);
+
+    /** Send a "ver" status probe (not logged, not recorded as the last command). */
+    void sendProbe();
+
+    /**
+     * FULL mode housekeeping: line break detection, wake and boot timeouts,
+     * boot polling and the idle status probe.
+     * @param now Current millis()
+     */
+    void processPowerTracking(unsigned long now);
+
+    /**
+     * Handle pending operations: power tracking, SVS keep-alive.
      */
     void processPendingOperations();
 };

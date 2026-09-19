@@ -160,6 +160,7 @@ class AsyncWebServerRequest {
     bool _isMultipart;
     bool _isPlainPost;
     bool _expectingContinue;
+    bool _keepAlive = false;  // TinkLink patch
     size_t _contentLength;
     size_t _parsedLength;
 
@@ -203,6 +204,13 @@ class AsyncWebServerRequest {
   public:
     File _tempFile;
     void *_tempObject;
+
+    // TinkLink patch: HTTP keep-alive (opt-in per request). When set before
+    // send(), the response says "Connection: keep-alive" and, once it has
+    // been fully acknowledged, the connection is handed to a fresh request
+    // object instead of waiting for the client to close it.
+    void setKeepAlive(bool keepAlive){ _keepAlive = keepAlive; }
+    bool keepAlive() const { return _keepAlive; }
 
     AsyncWebServerRequest(AsyncWebServer*, AsyncClient*);
     ~AsyncWebServerRequest();

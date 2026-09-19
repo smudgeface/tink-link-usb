@@ -39,6 +39,9 @@ public:
     bool isConnected() const override;
     bool sendData(const String& data) override;
     bool readLine(String& line) override;
+    size_t read(uint8_t* buf, size_t maxLen) override;
+    size_t write(const uint8_t* data, size_t length) override;
+    size_t writeAvailable() const override;
     size_t available() const override;  // Note: calls non-const HardwareSerial method
 
     /**

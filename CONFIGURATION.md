@@ -80,6 +80,7 @@ Configures the RetroTINK 4K connection and power management.
 | `txPin` | integer | GPIO pin for transmit (TX) — only used when `serialMode` is `"uart"` |
 | `rxPin` | integer | GPIO pin for receive (RX) — only used when `serialMode` is `"uart"` |
 | `baudRate` | integer | *Optional.* Serial baud rate. Defaults to `2000000` for `"usb"` and `115200` for `"uart"` |
+| `retroBridgeApi` | boolean | *Optional.* Enable the Retro-Bridge compatible API (`/api/v1/*`) used by the RT4K Profiler and Remote web apps. Defaults to `true` |
 
 **Serial Modes:**
 - `"usb"` — Use USB Host (ESP32-S3 only, requires EspUsbHost library and FTDI FT232R)
@@ -90,8 +91,8 @@ Configures the RetroTINK 4K connection and power management.
 | Mode | Description |
 |------|-------------|
 | `"off"` | No power management — RetroTINK always considered powered on |
-| `"simple"` | Send menu commands only when RetroTINK is detected (checks for `TINK` prompt) |
-| `"full"` | Auto-detects power state, sends wake command if needed, waits for ready state before commands |
+| `"simple"` | On the first input change, sends `pwr on` and waits 15 seconds before the profile command; every later command is sent immediately. For setups where TinkLink can't hear the RetroTINK's replies |
+| `"full"` | Default. On every input change, sends `pwr on` first: the reply tells whether the RetroTINK was asleep. If it was, waits until it answers again (about 5 s) before sending the profile command; otherwise sends it immediately. Needs RetroTINK firmware 1.75+ for the replies; with older firmware it falls back to the status text that firmware prints |
 
 **Notes:**
 - USB mode runs at **2,000,000 baud, 8N1** by default — the USB serial default since RetroTINK 4K firmware 1.75. For older RetroTINK firmware, set `"baudRate": 115200`
@@ -99,7 +100,8 @@ Configures the RetroTINK 4K connection and power management.
 - `baudRate` is omitted from the default config so each mode uses its own default. Supported USB rates: 300–921600 standard rates, 1000000, 1500000, 2000000, 3000000 (anything else falls back to 2000000)
 - Persistent "RX line errors ... framing" warnings in the log mean the baud rate doesn't match the RetroTINK's
 - Change the baud rate on the Config page (RetroTINK section) or with `POST /api/config/tink`; it applies immediately. Choosing the serial mode's default removes `baudRate` from the config
-- USB mode uses the FTDI FT232R driver via USB OTG (S3 only)
+- USB mode uses the FTDI FT232R driver via USB OTG (S3 only), with RTS/CTS hardware flow control
+- `retroBridgeApi` lets apps made for the Retro-Bridge WiFi adapter connect to TinkLink by address (in the app: *Connect via Retro-Bridge*, then TinkLink's IP or `.local` name). These endpoints deliberately allow cross-origin requests from public web pages — that is how the apps work — so any page you allow to reach your local network can control the RetroTINK while it is enabled. Toggle it on the Config page (RetroTINK section) or with `POST /api/config/tink`; it applies immediately
 - Full power management provides the most reliable operation with automatic wake/sleep handling
 
 ---
@@ -362,4 +364,4 @@ This versioning ensures that restoring old or incompatible configuration files d
 
 ---
 
-**Last Updated:** 2026-09-10 (v1.12.0)
+**Last Updated:** 2026-09-19 (v1.13.0)
