@@ -32,6 +32,10 @@
                 <span class="status-value" id="wifi-ip">--</span>
             </div>
             <div class="status-item">
+                <span class="status-label">Hostname</span>
+                <span class="status-value" id="wifi-mdns">--</span>
+            </div>
+            <div class="status-item">
                 <span class="status-label">Signal</span>
                 <span class="status-value" id="wifi-rssi">--</span>
             </div>
@@ -112,6 +116,7 @@
 
                     document.getElementById('wifi-ssid').textContent = data.wifi.ssid || '--';
                     document.getElementById('wifi-ip').textContent = data.wifi.ip || '--';
+                    document.getElementById('wifi-mdns').textContent = data.wifi.mdnsName ? data.wifi.mdnsName + '.local' : '--';
                     document.getElementById('wifi-rssi').textContent = data.wifi.rssi ? data.wifi.rssi + ' dBm' : '--';
 
                     // Switcher status

@@ -159,6 +159,15 @@ public:
      */
     int getRSSI() const;
 
+    /**
+     * Get the name the mDNS responder currently answers to.
+     * Normally the configured hostname. After a name conflict on the network
+     * the responder renames itself (e.g. "tinklink-2"); this reports the
+     * result, refreshed every few seconds by update().
+     * @return mDNS hostname without the .local suffix, or empty if mDNS is not running
+     */
+    String getMdnsName() const { return _mdnsName; }
+
     /** @return Current Access Point configuration */
     APConfig getAPConfig() const { return _apConfig; }
 
@@ -185,6 +194,13 @@ private:
     unsigned long _lastApReconnectAttempt;
     unsigned long _apReconnectStartTime;
 
+    // mDNS name actually in use (differs from _hostname after a name conflict)
+    String _mdnsName;
+    unsigned long _lastMdnsNameCheck;
+
+    static const unsigned long MDNS_NAME_CHECK_INTERVAL_MS = 5000; // 5s between name checks
+    static const int MDNS_MAX_NAME_SUFFIX = 9;                     // Highest "-N" suffix probed
+
     static const unsigned long CONNECT_TIMEOUT_MS = 15000;   // 15 seconds
     static const int MAX_RETRIES = 2;                        // 2 retries = 3 total attempts
     static const unsigned long BASE_RETRY_DELAY_MS = 5000;   // 5s, 10s delays
@@ -199,6 +215,7 @@ private:
 
     void setState(State newState);
     void setupMDNS();
+    void checkMDNSName();
     void generateAPConfig();
     void handleRetryLogic();
     void handleApReconnect();

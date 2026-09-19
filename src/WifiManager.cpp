@@ -13,6 +13,7 @@ WifiManager::WifiManager()
     , _apReconnecting(false)
     , _lastApReconnectAttempt(0)
     , _apReconnectStartTime(0)
+    , _lastMdnsNameCheck(0)
     , _stateCallback(nullptr)
 {
     generateAPConfig();
@@ -93,6 +94,8 @@ void WifiManager::disconnect() {
 
 void WifiManager::update() {
     wl_status_t status = WiFi.status();
+
+    checkMDNSName();
 
     switch (_state) {
         case State::CONNECTING:
@@ -252,14 +255,56 @@ void WifiManager::setState(State newState) {
 }
 
 void WifiManager::setupMDNS() {
+    // Give the interface an IPv6 link-local address so the mDNS responder can
+    // answer AAAA queries. Apple's resolver asks for A and AAAA together and
+    // waits for both: with no AAAA answer every lookup of <hostname>.local
+    // took its full 5 s timeout. Must be repeated after every (re)connect and
+    // mode change; the HTTP server listens on IPv6 too (see lib/AsyncTCP).
+    if (_mode == Mode::AP || _mode == Mode::AP_STA) {
+        WiFi.softAPenableIpV6();
+    }
+    if (_mode != Mode::AP && WiFi.status() == WL_CONNECTED) {
+        WiFi.enableIpV6();
+    }
+
     // Restart the responder - MDNS.begin() fails if mDNS is already running,
     // which happens on every reconnect or AP <-> STA transition
     MDNS.end();
+    _mdnsName = "";
     if (MDNS.begin(_hostname.c_str())) {
         MDNS.addService("http", "tcp", 80);
+        _mdnsName = _hostname;
+        _lastMdnsNameCheck = millis();
         LOG_INFO("WifiManager: mDNS started - http://%s.local", _hostname.c_str());
     } else {
         LOG_ERROR("WifiManager: mDNS setup failed");
+    }
+}
+
+void WifiManager::checkMDNSName() {
+    if (_mdnsName.length() == 0 || millis() - _lastMdnsNameCheck < MDNS_NAME_CHECK_INTERVAL_MS) {
+        return;
+    }
+    _lastMdnsNameCheck = millis();
+
+    // After a name conflict the responder renames itself (<hostname>-2, -3, ...)
+    // and offers no way to read the result, only to test whether a name is ours.
+    String name = _hostname;
+    for (int suffix = 2; !mdns_hostname_exists(name.c_str()); suffix++) {
+        if (suffix > MDNS_MAX_NAME_SUFFIX) {
+            return;  // Not found (responder busy renaming?) - keep the last known name
+        }
+        name = _hostname + "-" + String(suffix);
+    }
+
+    if (name != _mdnsName) {
+        _mdnsName = name;
+        if (name == _hostname) {
+            LOG_INFO("WifiManager: mDNS name is %s.local", name.c_str());
+        } else {
+            LOG_WARN("WifiManager: mDNS name conflict - another device answers to %s.local, now reachable as http://%s.local",
+                     _hostname.c_str(), name.c_str());
+        }
     }
 }
 

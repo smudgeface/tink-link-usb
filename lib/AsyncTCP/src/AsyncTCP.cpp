@@ -1049,6 +1049,11 @@ uint32_t AsyncClient::getRemoteAddress() {
     if(!_pcb) {
         return 0;
     }
+    // TinkLink patch: the IPv4 accessors report 0.0.0.0 for an IPv6 peer
+    // instead of the first four bytes of its IPv6 address.
+    if(!IP_IS_V4_VAL(_pcb->remote_ip)) {
+        return 0;
+    }
     return _pcb->remote_ip.u_addr.ip4.addr;
 }
 
@@ -1061,6 +1066,10 @@ uint16_t AsyncClient::getRemotePort() {
 
 uint32_t AsyncClient::getLocalAddress() {
     if(!_pcb) {
+        return 0;
+    }
+    // TinkLink patch: see getRemoteAddress()
+    if(!IP_IS_V4_VAL(_pcb->local_ip)) {
         return 0;
     }
     return _pcb->local_ip.u_addr.ip4.addr;
@@ -1252,15 +1261,23 @@ void AsyncServer::begin(){
         return;
     }
     int8_t err;
-    _pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
+    // TinkLink patch: a server bound to "any" address listens on IPv4 and
+    // IPv6 (upstream: IPv4 only). A server bound to a specific IPv4 address
+    // is unchanged.
+    bool anyAddr = ((uint32_t) _addr == 0);
+    _pcb = tcp_new_ip_type(anyAddr ? IPADDR_TYPE_ANY : IPADDR_TYPE_V4);
     if (!_pcb){
         log_e("_pcb == NULL");
         return;
     }
 
     ip_addr_t local_addr;
-    local_addr.type = IPADDR_TYPE_V4;
-    local_addr.u_addr.ip4.addr = (uint32_t) _addr;
+    if (anyAddr) {
+        local_addr = *IP_ANY_TYPE;
+    } else {
+        local_addr.type = IPADDR_TYPE_V4;
+        local_addr.u_addr.ip4.addr = (uint32_t) _addr;
+    }
     err = _tcp_bind(_pcb, &local_addr, _port);
 
     if (err != ERR_OK) {
