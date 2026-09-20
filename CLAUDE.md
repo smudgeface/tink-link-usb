@@ -84,7 +84,7 @@ The version constant is in the `handleApiConfigBackup()` method in `WebServer.cp
 
 ### Git Tags
 
-After significant releases, create annotated tags. Tag messages should include a one-line summary followed by a bullet point for each major change area — matching the level of detail used in the README changelog:
+After significant releases, create annotated tags. Tag messages should include a one-line summary followed by a bullet point for each major change area — matching the level of detail used in the changelog (`docs/changelog.md`):
 
 ```bash
 git tag -a v1.9.0 -m "$(cat <<'EOF'
@@ -306,7 +306,7 @@ Before committing significant changes:
 3. Update default `data/config.json`
 4. Update web UI if needed
 5. Update default `data_c3/config.json` if the option applies to ESP32-C3
-6. Update `CONFIGURATION.md` with the new field (type, defaults, description)
+6. Update `docs/configuration.md` with the new field (type, defaults, description)
 7. **Ensure the API handler applies the change live** — all user-facing config must take effect without a reboot. If the config controls an object lifecycle (create/destroy), use the pointer-to-pointer pattern (see `DenonAvr**` in WebServer).
 
 ### Changing Pin Assignments
@@ -425,10 +425,16 @@ tink-link-usb/
 │   ├── AsyncTCP/          # Vendored TCP library with TinkLink's dual-stack (IPv4 + IPv6) patch
 │   └── ESPAsyncWebServer/ # Vendored web server library with TinkLink's keep-alive patch
 ├── platformio.ini     # PlatformIO configuration
-├── README.md          # User documentation
-├── CLAUDE.md          # This file (AI assistant guide)
-└── CONFIGURATION.md   # Configuration reference for all settings
+├── README.md          # Short user-facing overview (see Documentation below)
+├── docs/              # Detailed docs: hardware, building, configuration, troubleshooting, changelog, history
+└── CLAUDE.md          # This file (AI assistant guide)
 ```
+
+### Documentation Layout
+
+- **`README.md` is for people deciding whether and how to use TinkLink.** Keep it short: what it does, what you need, quick start, links. No release history, no internals (class names, state names, config keys), no deep hardware detail.
+- Detail goes in `docs/`: `hardware.md`, `building.md`, `configuration.md`, `alternative-boards.md`, `troubleshooting.md`, `retrotink-serial.md`, `changelog.md` (release notes, newest first), `history.md` (project background).
+- On a release: add the entry to `docs/changelog.md` and update the version line in `README.md`.
 
 ## Additional Notes
 
@@ -454,8 +460,9 @@ tink-link-usb/
 
 ## References
 
-- **User Documentation**: README.md
-- **Configuration Reference**: CONFIGURATION.md
+- **User Documentation**: README.md (overview) and `docs/`
+- **Configuration Reference**: docs/configuration.md
+- **Changelog**: docs/changelog.md
 - **API Reference**: http://tinklink.local/api.html (when device is running)
 - **Repository**: https://github.com/smudgeface/tink-link-usb
 - **HEOS CLI Protocol Specification**: assets/docs/HEOS_CLI_Protocol_Specification.pdf
