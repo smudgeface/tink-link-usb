@@ -4,7 +4,7 @@ TinkLink-USB is designed for the ESP32-S3 with USB Host, but it also runs on boa
 
 ## ESP32-C3 Super Mini Plus
 
-<img src="assets/hardware/esp32-c3-super-mini-plus.png" width="200" alt="ESP32-C3 Super Mini Plus">
+<img src="../assets/hardware/esp32-c3-super-mini-plus.png" width="200" alt="ESP32-C3 Super Mini Plus">
 
 The [ESP32-C3 Super Mini Plus](https://www.espboards.dev/esp32/esp32-c3-super-mini-plus/) is a compact, low-cost board with WiFi, two hardware UARTs, and an onboard WS2812 RGB LED. It cannot use USB Host, so it communicates with the RetroTINK 4K over UART serial instead.
 
@@ -23,7 +23,7 @@ The [ESP32-C3 Super Mini Plus](https://www.espboards.dev/esp32/esp32-c3-super-mi
 
 The C3 uses both hardware UARTs — one for the video switcher, one for the RetroTINK:
 
-<img src="assets/hardware/esp32-c3-super-mini-plus-pinout.png" width="500" alt="ESP32-C3 Super Mini Plus pinout">
+<img src="../assets/hardware/esp32-c3-super-mini-plus-pinout.png" width="500" alt="ESP32-C3 Super Mini Plus pinout">
 
 | Function | UART | GPIO | Baud |
 |----------|------|------|------|
@@ -71,7 +71,7 @@ The C3 uses a separate filesystem image (`data_c3/`) with board-specific default
 }
 ```
 
-Adjust pin numbers if your wiring differs. Edit `triggers` to match your switcher inputs and RT4K profiles. See [Configuration Reference](CONFIGURATION.md) for detailed descriptions of all settings.
+Adjust pin numbers if your wiring differs. Edit `triggers` to match your switcher inputs and RT4K profiles. See [Configuration Reference](configuration.md) for detailed descriptions of all settings.
 
 #### Power Management Modes
 
@@ -118,6 +118,6 @@ pio run -t buildfs -t otafs -e esp32c3
 
 ### References
 
-- [Configuration Reference](CONFIGURATION.md) — Complete guide to all config.json and wifi.json settings
+- [Configuration Reference](configuration.md) — Complete guide to all config.json and wifi.json settings
 - [ESP32-C3 Super Mini Plus — ESPBoards.dev](https://www.espboards.dev/esp32/esp32-c3-super-mini-plus/)
 - [ESP32-C3 Datasheet](https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf)
